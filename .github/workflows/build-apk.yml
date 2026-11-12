@@ -18,6 +18,13 @@ jobs:
           channel: stable
           cache: true
       - run: flutter pub get
+      - name: Corregir plugins viejos (proguard)
+        run: |
+          PC="${PUB_CACHE:-$HOME/.pub-cache}"
+          find "$PC/hosted" -path "*/android/build.gradle*" -type f -print0 | xargs -0 grep -l "proguard-android.txt" | while read f; do
+            echo "Corrigiendo: $f"
+            sed -i "s/proguard-android.txt/proguard-android-optimize.txt/g" "$f"
+          done
       - run: flutter build apk --release
       - run: cp build/app/outputs/flutter-apk/app-release.apk MediControl.apk
       - uses: actions/upload-artifact@v4

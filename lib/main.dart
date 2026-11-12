@@ -14,10 +14,13 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:timezone/data/latest_all.dart' as tzdata;
+import 'package:timezone/timezone.dart' as tz;
 
 /// Página principal empaquetada en la APK
 const String kHtml = 'assets/web/index.html';
@@ -31,11 +34,129 @@ Future<void> main() async {
   if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
     await InAppWebViewController.setWebContentsDebuggingEnabled(kDebugMode);
   }
+  await Avisos.iniciar();
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     statusBarColor: kPri2,
     statusBarIconBrightness: Brightness.light,
   ));
   runApp(const MediControlApp());
+}
+
+// =============================================================
+//  NOTIFICACIONES LOCALES (suenan aunque la app esté cerrada)
+// =============================================================
+class Avisos {
+  static final FlutterLocalNotificationsPlugin _p = FlutterLocalNotificationsPlugin();
+  static const String _canal = 'medicacion';
+  static String _ultimoStock = '';
+
+  static AndroidFlutterLocalNotificationsPlugin? get _android =>
+      _p.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+
+  static Future<void> iniciar() async {
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return;
+    tzdata.initializeTimeZones();
+    await _p.initialize(
+      const InitializationSettings(android: AndroidInitializationSettings('@mipmap/ic_launcher')),
+    );
+    await _android?.createNotificationChannel(const AndroidNotificationChannel(
+      _canal,
+      'Medicación',
+      description: 'Recordatorios de tomas de medicación',
+      importance: Importance.max,
+      playSound: true,
+      enableVibration: true,
+    ));
+  }
+
+  /// Pide permiso de notificaciones (Android 13+) y de alarmas exactas.
+  static Future<void> pedirPermisos() async {
+    final a = _android;
+    if (a == null) return;
+    try {
+      await a.requestNotificationsPermission();
+      final exactas = await a.canScheduleExactNotifications() ?? true;
+      if (!exactas) await a.requestExactAlarmsPermission();
+    } catch (_) {}
+  }
+
+  static NotificationDetails _det(String cuerpo) => NotificationDetails(
+        android: AndroidNotificationDetails(
+          _canal,
+          'Medicación',
+          channelDescription: 'Recordatorios de tomas de medicación',
+          importance: Importance.max,
+          priority: Priority.high,
+          category: AndroidNotificationCategory.reminder,
+          styleInformation: BigTextStyleInformation(cuerpo),
+          ticker: 'MediControl',
+        ),
+      );
+
+  static Future<void> _agendar(int id, String titulo, String cuerpo, DateTime cuando, AndroidScheduleMode modo) async {
+    try {
+      await _p.zonedSchedule(id, titulo, cuerpo, tz.TZDateTime.from(cuando, tz.UTC), _det(cuerpo),
+          androidScheduleMode: modo);
+    } catch (_) {
+      // si el sistema no permite alarmas exactas, cae a inexacta
+      await _p.zonedSchedule(id, titulo, cuerpo, tz.TZDateTime.from(cuando, tz.UTC), _det(cuerpo),
+          androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle);
+    }
+  }
+
+  /// Recibe el JSON de la acción "alarmas" y reprograma todo. Devuelve cuántas quedaron.
+  static Future<int> programar(String json) async {
+    if (_android == null) return 0;
+    final data = jsonDecode(json) as Map<String, dynamic>;
+    final tomas = (data['tomas'] as List?) ?? const [];
+    await _p.cancelAll();
+
+    final exactas = await _android!.canScheduleExactNotifications() ?? false;
+    final modo = exactas ? AndroidScheduleMode.exactAllowWhileIdle : AndroidScheduleMode.inexactAllowWhileIdle;
+    final ahora = DateTime.now();
+    var id = 100;
+    var n = 0;
+
+    for (final x in tomas) {
+      if (id > 480) break; // límite de Android (~500 alarmas por app)
+      final m = Map<String, dynamic>.from(x as Map);
+      final cuando = DateTime.tryParse('${m['fecha']} ${m['hora']}:00');
+      if (cuando == null) continue;
+      final ind = '${m['indicaciones'] ?? ''}'.trim();
+      final cuerpo = '${m['dosis']} · ${m['via']}\n${m['paciente']}${ind.isNotEmpty ? '\n📝 $ind' : ''}';
+
+      if (cuando.isAfter(ahora)) {
+        await _agendar(id++, '💊 ${m['hora']} · ${m['medicamento']}', cuerpo, cuando, modo);
+        n++;
+      }
+      final tarde = cuando.add(const Duration(minutes: 30));
+      if (tarde.isAfter(ahora)) {
+        await _agendar(id++, '⏰ Toma atrasada · ${m['medicamento']}',
+            'Programada a las ${m['hora']} y todavía no se registró.\n${m['paciente']}', tarde, modo);
+        n++;
+      }
+    }
+
+    // Stock bajo: aviso inmediato, una vez por día
+    final stock = ((data['stockBajo'] as List?) ?? const []).map((e) => '$e').toList();
+    final hoy = '${ahora.year}-${ahora.month}-${ahora.day}';
+    if (stock.isNotEmpty && _ultimoStock != hoy) {
+      _ultimoStock = hoy;
+      await _p.show(2, '⚠ Stock bajo de medicación', stock.join('\n'), _det(stock.join('\n')));
+    }
+    return n;
+  }
+
+  static Future<void> cancelar() async {
+    if (_android == null) return;
+    await _p.cancelAll();
+  }
+
+  static Future<void> probar() async {
+    await pedirPermisos();
+    const cuerpo = 'Así vas a recibir los recordatorios de cada toma.';
+    await _p.show(1, '💊 MediControl', cuerpo, _det(cuerpo));
+  }
 }
 
 class MediControlApp extends StatelessWidget {
@@ -145,7 +266,25 @@ class _PantallaWebState extends State<PantallaWeb> {
         },
       ));
     }
-    // Respaldo: handler clásico (frame principal)
+    // Notificaciones programadas
+    c.addJavaScriptHandler(
+      handlerName: 'programarAlarmas',
+      callback: (args) async {
+        if (args.isEmpty) return 0;
+        await Avisos.pedirPermisos();
+        return Avisos.programar('${args[0]}');
+      },
+    );
+    c.addJavaScriptHandler(handlerName: 'cancelarAlarmas', callback: (args) async {
+      await Avisos.cancelar();
+      return true;
+    });
+    c.addJavaScriptHandler(handlerName: 'probarNotificacion', callback: (args) async {
+      await Avisos.probar();
+      return true;
+    });
+
+    // Guardar/abrir archivos
     c.addJavaScriptHandler(
       handlerName: 'guardarArchivo',
       callback: (args) async {

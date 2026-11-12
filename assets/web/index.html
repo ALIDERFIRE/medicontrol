@@ -85,7 +85,11 @@ nav.tabbar button.on{color:var(--pri)}
 .chip.ACTIVO,.chip.ADMINISTRADA{background:var(--ok-l);color:var(--ok)}
 .chip.PENDIENTE{background:var(--pri-l);color:var(--pri2)}
 .chip.ATRASADA,.chip.SUSPENDIDO,.chip.INACTIVO{background:var(--err-l);color:var(--err)}
-.chip.OMITIDA,.chip.RECHAZADA,.chip.ALTA{background:var(--warn-l);color:var(--warn)}
+.chip.OMITIDA,.chip.RECHAZADA,.chip.ALTA,.chip.ALTERADO{background:var(--warn-l);color:var(--warn)}
+.chip.CRITICO{background:var(--err);color:#fff}.chip.NORMAL{background:var(--ok-l);color:var(--ok)}
+.ib.wa{background:#25D366;color:#fff}
+.switch{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0}
+.switch input{width:auto;transform:scale(1.4)}
 .alergia{background:var(--err-l);color:var(--err);border-radius:10px;padding:8px 12px;font-weight:600;font-size:13px;margin-top:8px}
 
 .pac-item{display:flex;align-items:center;gap:12px;cursor:pointer}
@@ -190,7 +194,8 @@ table.t td{padding:8px;border-bottom:1px solid var(--borde);vertical-align:top}
    ESTADO Y UTILIDADES
    ========================================================= */
 var S = { token: null, user: null, vista: 'hoy', fecha: null, filtroPac: '', pac: null, ficha: null, tab: 'datos', pila: [] };
-var ROL_TXT = { ADMIN: 'Administrador', PROFESIONAL: 'Profesional de salud', CUIDADOR: 'Cuidador / Enfermería', CONSULTA: 'Solo consulta' };
+var ROL_TXT = { ADMIN: 'Administrador', PROFESIONAL: 'Profesional de salud', CUIDADOR: 'Cuidador / Enfermería', CONSULTA: 'Solo consulta', PACIENTE: 'Paciente' };
+var TIPOS_ANALISIS = ['HEMOGRAMA COMPLETO', 'GLUCEMIA', 'HEMOGLOBINA GLICOSILADA (HbA1c)', 'PERFIL LIPÍDICO', 'FUNCIÓN RENAL (UREA/CREATININA)', 'HEPATOGRAMA', 'ELECTROLITOS', 'PERFIL TIROIDEO', 'ORINA SIMPLE', 'COAGULOGRAMA', 'PCR / VSG', 'CULTIVO', 'RX', 'ECOGRAFÍA', 'TOMOGRAFÍA', 'RESONANCIA', 'ELECTROCARDIOGRAMA', 'OTRO'];
 var TIPOS_DOC = ['ESTUDIO DE LABORATORIO', 'RECETA', 'IMAGEN (RX/ECO/TAC/RM)', 'INFORME MÉDICO', 'EPICRISIS', 'CONSENTIMIENTO', 'DOCUMENTO DE IDENTIDAD', 'SEGURO / CARNET', 'OTRO'];
 var VIAS = ['ORAL', 'SUBLINGUAL', 'INTRAVENOSA (IV)', 'INTRAMUSCULAR (IM)', 'SUBCUTÁNEA (SC)', 'INHALATORIA', 'TÓPICA', 'OFTÁLMICA', 'ÓTICA', 'NASAL', 'RECTAL', 'TRANSDÉRMICA', 'SONDA'];
 var FRECS = [[0, 'A demanda (SOS)'], [1, 'Cada 1 h'], [2, 'Cada 2 h'], [3, 'Cada 3 h'], [4, 'Cada 4 h'], [6, 'Cada 6 h'], [8, 'Cada 8 h'], [12, 'Cada 12 h'], [24, '1 vez al día'], [48, 'Cada 2 días'], [72, 'Cada 3 días'], [168, '1 vez por semana']];
@@ -203,7 +208,9 @@ function fFecha(s) { if (!s) return '—'; var p = String(s).substring(0, 10).sp
 function iniciales(n, a) { return ((a || '').charAt(0) + (n || '').charAt(0)).toUpperCase(); }
 function frecTxt(f) { f = Number(f) || 0; var x = FRECS.filter(function (r) { return r[0] === f; })[0]; return x ? x[1] : 'Cada ' + f + ' h'; }
 function puede(roles) { return S.user && roles.indexOf(S.user.rol) >= 0; }
-var P_REG = ['ADMIN', 'PROFESIONAL', 'CUIDADOR'], P_CLI = ['ADMIN', 'PROFESIONAL'];
+var P_REG = ['ADMIN', 'PROFESIONAL', 'CUIDADOR'], P_CLI = ['ADMIN', 'PROFESIONAL'], P_TOMA = ['ADMIN', 'PROFESIONAL', 'CUIDADOR', 'PACIENTE'];
+function esPaciente() { return S.user && S.user.rol === 'PACIENTE'; }
+function enApp() { return !!(window.flutter_inappwebview && window.flutter_inappwebview.callHandler); }
 
 function store(k, v) { try { if (v === undefined) return localStorage.getItem(k); if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) { return null; } }
 
@@ -218,7 +225,7 @@ function loading(on) { cargas += on ? 1 : -1; if (cargas < 0) cargas = 0; $('loa
    CONEXIÓN CON LA API (Apps Script)
    >>> Pegá acá tu URL /exec <<<
    ========================================================= */
-var API_URL = 'https://script.google.com/macros/s/AKfycbzhMTxEDUhaquD50I_cc3tyIGTLNffi_cOS7d0JfGX4g7CZQd2gUsOMr2BY3O0VD2Eydw/exec';
+var API_URL = 'https://script.google.com/macros/s/AKfycbxr9SHZymKdGJZxYSFHHNeOATw6iBR0p8LhD-YAx0UK1VKhk5H0tCKADM_-4z0AXrI5eg/exec';
 
 /** POST text/plain (sin preflight CORS) → JSON */
 function gs(fn, args) {
@@ -270,11 +277,45 @@ function entrar() {
   $('login').classList.add('oculto'); $('app').classList.remove('oculto');
   $('uNom').textContent = S.user.nombre; $('uRol').textContent = ROL_TXT[S.user.rol] || S.user.rol;
   $('navUsr').classList.toggle('oculto', S.user.rol !== 'ADMIN');
+  var bp = document.querySelector('nav.tabbar button[data-v="pacientes"]');
+  bp.lastChild.textContent = esPaciente() ? 'Mi ficha' : 'Pacientes';
   S.fecha = hoyStr();
   ir('hoy');
+  setTimeout(syncAlarmas, 1500);
+}
+
+/* =========================================================
+   NOTIFICACIONES (APK): programa las tomas en el celular
+   ========================================================= */
+function notifActivas() { return store('mc_notif') !== 'NO'; }
+function syncAlarmas() {
+  if (!enApp() || !S.token) return;
+  if (!notifActivas()) { window.flutter_inappwebview.callHandler('cancelarAlarmas'); return; }
+  call('alarmas', { dias: 3 }, true).then(function (r) {
+    window.flutter_inappwebview.callHandler('programarAlarmas', JSON.stringify(r));
+  }).catch(function () {});
+}
+setInterval(function () { if (S.token && !document.hidden) syncAlarmas(); }, 30 * 60000);
+document.addEventListener('visibilitychange', function () { if (!document.hidden && S.token) { syncAlarmas(); if (S.vista === 'hoy') cargarHoy(true); } });
+
+/* WhatsApp: aviso manual al paciente (abre WhatsApp con el mensaje armado) */
+function waNumero(tel) {
+  var n = String(tel || '').replace(/\D/g, '');
+  if (!n) return '';
+  if (n.indexOf('595') === 0) return n;
+  if (n.charAt(0) === '0') n = n.substring(1);
+  return '595' + n;
+}
+function avisarWa(i) {
+  var t = AG.agenda[i], n = waNumero(t.telefono);
+  if (!n) return toast('El paciente no tiene teléfono cargado en la ficha', 'err');
+  var msg = 'Hola ' + t.paciente.split(',').pop().trim() + ', te recordamos tu medicación de las ' + t.hora + ': ' +
+    t.medicamento + ' ' + t.dosis + ' (' + t.via + ').' + (t.indicaciones ? ' ' + t.indicaciones + '.' : '') + ' — MediControl';
+  window.open('https://wa.me/' + n + '?text=' + encodeURIComponent(msg), '_blank');
 }
 
 function salir(vencida) {
+  if (enApp()) window.flutter_inappwebview.callHandler('cancelarAlarmas');
   if (S.token && !vencida) gs('logout', [S.token]).catch(function () {});
   S.token = null; S.user = null; store('mc_token', null); store('mc_user', null);
   $('app').classList.add('oculto'); $('login').classList.remove('oculto'); $('lPwd').value = '';
@@ -297,6 +338,7 @@ function salir(vencida) {
    NAVEGACIÓN
    ========================================================= */
 function ir(v, conPila) {
+  if (v === 'pacientes' && esPaciente()) { S.pac = S.user.paciente_id; S.tab = S.tab || 'datos'; v = 'ficha'; conPila = false; }
   if (!conPila) S.pila = [];
   S.vista = v;
   document.querySelectorAll('nav.tabbar button').forEach(function (b) { b.classList.toggle('on', b.dataset.v === v || (v === 'ficha' && b.dataset.v === 'pacientes')); });
@@ -333,6 +375,14 @@ function pintarAgenda() {
     '<div class="stat warn"><b>' + c.PENDIENTE + '</b><span>Pendientes</span></div>' +
     '<div class="stat err"><b>' + c.ATRASADA + '</b><span>Atrasadas</span></div></div>';
 
+  if (AG.analisisAlerta && AG.analisisAlerta.length) {
+    h += '<div class="card" style="border-left:5px solid var(--err)"><b class="cond" style="font-size:17px;color:var(--err)">🧪 Análisis con resultados fuera de lo normal</b>' +
+      AG.analisisAlerta.map(function (a) {
+        return '<div style="font-size:13px;margin-top:6px;cursor:pointer" onclick="abrirFicha(\'' + a.paciente_id + '\',\'analisis\')"><span class="chip ' + a.estado + '">' + a.estado + '</span> <b>' +
+          esc(a.tipo_estudio) + '</b> · ' + fFecha(a.fecha) + ' · ' + esc(a.paciente) + (a.diagnostico ? '<br><span style="color:var(--gris)">' + esc(a.diagnostico) + '</span>' : '') + '</div>';
+      }).join('') + '</div>';
+  }
+
   if (AG.stockBajo.length) {
     h += '<div class="card" style="border-left:5px solid var(--warn)"><b class="cond" style="font-size:17px;color:var(--warn)">⚠ Stock bajo</b>' +
       AG.stockBajo.map(function (s) { return '<div style="font-size:13px;margin-top:4px">' + esc(s.medicamento) + ' — <b>' + esc(s.stock) + '</b> u. · ' + esc(s.paciente) + '</div>'; }).join('') + '</div>';
@@ -356,7 +406,7 @@ function pintarAgenda() {
     h += '<div class="titsec"><h2>A demanda (SOS)</h2></div>';
     AG.sos.forEach(function (s, i) {
       h += '<div class="toma"><div class="inf"><div class="pac">' + esc(s.paciente) + '</div><div class="med">' + esc(s.medicamento) + '</div><div class="det">' + esc(s.dosis + ' · ' + s.via) + (s.indicaciones ? ' · ' + esc(s.indicaciones) : '') + '</div><div class="det">Dadas este día: <b>' + s.dadas + '</b></div></div>' +
-        (puede(P_REG) && AG.esHoy ? '<div class="acc"><button class="btn sm ok" onclick="darSos(' + i + ')">Dar ahora</button></div>' : '') + '</div>';
+        (puede(P_TOMA) && AG.esHoy ? '<div class="acc"><button class="btn sm ok" onclick="darSos(' + i + ')">' + (esPaciente() ? 'La tomé' : 'Dar ahora') + '</button></div>' : '') + '</div>';
     });
   }
   $('hoyCont').innerHTML = h;
@@ -365,10 +415,13 @@ function pintarAgenda() {
 function itemToma(t, i) {
   var hecha = ['ADMINISTRADA', 'OMITIDA', 'RECHAZADA'].indexOf(t.estado) >= 0;
   var acc = '';
-  if (puede(P_REG) && S.fecha <= hoyStr()) {
+  if (puede(P_TOMA) && S.fecha <= hoyStr()) {
     acc = hecha
       ? '<button class="ib gr" title="Corregir" onclick="dlgToma(' + i + ')">✎</button>'
       : '<button class="ib no" title="No administrada" onclick="dlgToma(' + i + ')">✕</button><button class="ib ok" title="Administrar" onclick="marcar(' + i + ',\'ADMINISTRADA\')">✓</button>';
+  }
+  if (!hecha && !esPaciente() && t.telefono && (t.estado === 'ATRASADA' || t.estado === 'PENDIENTE') && S.fecha === hoyStr()) {
+    acc = '<button class="ib wa" title="Avisar por WhatsApp" onclick="avisarWa(' + i + ')">✆</button>' + acc;
   }
   return '<div class="toma ' + t.estado + '"><div class="inf"><div class="pac" onclick="abrirFicha(\'' + t.paciente_id + '\')" style="cursor:pointer">' + esc(t.paciente) + '</div>' +
     '<div class="med">' + esc(t.medicamento) + ' <span class="chip ' + t.estado + '">' + t.estado + '</span></div>' +
@@ -382,14 +435,14 @@ function itemToma(t, i) {
 function marcar(i, estado, obs) {
   var t = AG.agenda[i];
   call('toma_registrar', { medicacion_id: t.medicacion_id, fecha: S.fecha, hora_programada: t.hora, estado: estado, observacion: obs || '' })
-    .then(function () { toast(estado === 'ADMINISTRADA' ? 'Toma registrada ✓' : 'Registrado', 'ok'); cerrarModal(); cargarHoy(true); });
+    .then(function () { toast(estado === 'ADMINISTRADA' ? 'Toma registrada ✓' : 'Registrado', 'ok'); cerrarModal(); cargarHoy(true); syncAlarmas(); });
 }
 
 function dlgToma(i) {
   var t = AG.agenda[i];
   modal('Registrar toma · ' + t.hora,
     '<div class="card" style="background:var(--fondo);box-shadow:none"><b>' + esc(t.medicamento) + '</b> — ' + esc(t.dosis) + '<br><small>' + esc(t.paciente) + '</small></div>' +
-    '<label>Estado</label><select id="tEst"><option value="ADMINISTRADA">Administrada</option><option value="OMITIDA">Omitida (no se dio)</option><option value="RECHAZADA">Rechazada por el paciente</option></select>' +
+    '<label>Estado</label><select id="tEst"><option value="ADMINISTRADA">' + (esPaciente() ? 'La tomé' : 'Administrada') + '</option><option value="OMITIDA">' + (esPaciente() ? 'No la tomé' : 'Omitida (no se dio)') + '</option>' + (esPaciente() ? '' : '<option value="RECHAZADA">Rechazada por el paciente</option>') + '</select>' +
     '<label>Observación</label><textarea id="tObs" placeholder="Motivo, reacción, etc.">' + esc(t.observacion || '') + '</textarea>' +
     '<button class="btn blq" onclick="marcar(' + i + ',$(\'tEst\').value,$(\'tObs\').value)">Guardar</button>' +
     (t.toma_id && puede(P_CLI) ? '<button class="btn blq lin" onclick="deshacerToma(\'' + t.toma_id + '\')">Deshacer registro</button>' : ''));
@@ -397,7 +450,7 @@ function dlgToma(i) {
 }
 function deshacerToma(id, recargarFicha) {
   if (!confirm('¿Eliminar este registro de toma?')) return;
-  call('toma_deshacer', { id: id }).then(function () { toast('Registro eliminado', 'ok'); cerrarModal(); if (recargarFicha) cargarFicha(); else cargarHoy(true); });
+  call('toma_deshacer', { id: id }).then(function () { toast('Registro eliminado', 'ok'); cerrarModal(); if (recargarFicha) cargarFicha(); else cargarHoy(true); syncAlarmas(); });
 }
 function darSos(i) {
   var s = AG.sos[i];
@@ -406,7 +459,7 @@ function darSos(i) {
     '<button class="btn blq ok" id="bSos">Registrar administración</button>');
   $('bSos').onclick = function () {
     call('toma_registrar', { medicacion_id: s.medicacion_id, fecha: hoyStr(), estado: 'ADMINISTRADA', observacion: $('sObs').value })
-      .then(function () { toast('Registrado ✓', 'ok'); cerrarModal(); cargarHoy(true); });
+      .then(function () { toast('Registrado ✓', 'ok'); cerrarModal(); cargarHoy(true); syncAlarmas(); });
   };
 }
 
@@ -438,9 +491,9 @@ function cargarPacientes() {
 /* =========================================================
    VISTA: FICHA DEL PACIENTE
    ========================================================= */
-function abrirFicha(id) {
+function abrirFicha(id, tab) {
   if (S.vista !== 'ficha') { S.pila.push(S.vista); hPush('ficha'); }
-  S.pac = id; S.tab = 'datos';
+  S.pac = id; S.tab = tab || 'datos';
   ir('ficha', true);
 }
 function vFicha() {
@@ -462,14 +515,17 @@ function pintarFicha() {
     '<button class="btn sm sec" onclick="fichaPdf()">⬇ Ficha PDF</button>' +
     (puede(P_CLI) ? '<button class="btn sm lin" onclick="dlgEstadoPac()">Estado</button>' : '') + '</div></div>';
 
-  var tabs = [['datos', 'Datos'], ['meds', 'Medicación (' + activas + ')'], ['tomas', 'Historial tomas'], ['signos', 'Signos vitales'], ['docs', 'Documentos (' + r.docs.length + ')']];
+  var crit = (r.analisis || []).filter(function (a) { return a.estado === 'CRITICO'; }).length;
+  var tabs = [['datos', 'Datos'], ['meds', 'Medicación (' + activas + ')'], ['analisis', 'Análisis (' + (r.analisis || []).length + ')' + (crit ? ' ⚠' : '')], ['tomas', 'Historial tomas'], ['signos', 'Signos vitales'], ['docs', 'Documentos (' + r.docs.length + ')']];
+  if (!tabs.some(function (t) { return t[0] === S.tab; })) S.tab = 'datos';
   h += '<div class="tabs">' + tabs.map(function (t) { return '<button class="' + (S.tab === t[0] ? 'on' : '') + '" onclick="S.tab=\'' + t[0] + '\';pintarFicha()">' + t[1] + '</button>'; }).join('') + '</div>';
-  h += ({ datos: tabDatos, meds: tabMeds, tomas: tabTomas, signos: tabSignos, docs: tabDocs })[S.tab](r);
+  h += ({ datos: tabDatos, meds: tabMeds, analisis: tabAnalisis, tomas: tabTomas, signos: tabSignos, docs: tabDocs })[S.tab](r);
   $('fCont').innerHTML = h;
 
   $('fab').classList.add('oculto');
   if (S.tab === 'meds' && puede(P_CLI)) fab(function () { dlgMed(null); });
-  if (S.tab === 'signos' && puede(P_REG)) fab(dlgSignos);
+  if (S.tab === 'signos' && puede(P_TOMA)) fab(dlgSignos);
+  if (S.tab === 'analisis' && puede(P_REG)) fab(function () { dlgAnalisis(null); });
   if (S.tab === 'docs' && puede(P_REG)) fab(dlgDoc);
 }
 
@@ -621,7 +677,7 @@ function dlgMed(m) {
     var d = { id: m.id || '', paciente_id: S.pac, medicamento: $('mMed').value, principio_activo: $('mPa').value, presentacion: $('mPres').value,
       dosis: $('mDos').value, via: $('mVia').value, frecuencia_horas: $('mFr').value, hora_inicio: $('mHi').value, fecha_inicio: $('mFi').value,
       fecha_fin: $('mFf').value, prescriptor: $('mPr').value, stock: $('mSt').value.trim(), indicaciones: $('mInd').value };
-    call('med_guardar', d).then(function () { toast('Medicación guardada ✓', 'ok'); cerrarModal(); cargarFicha(); });
+    call('med_guardar', d).then(function () { toast('Medicación guardada ✓', 'ok'); cerrarModal(); cargarFicha(); syncAlarmas(); });
   };
 }
 
@@ -630,7 +686,7 @@ function dlgMedEstado(i, estado) {
   modal({ ACTIVO: 'Reactivar', SUSPENDIDO: 'Suspender', FINALIZADO: 'Finalizar' }[estado] + ' medicación',
     '<div class="card" style="background:var(--fondo);box-shadow:none"><b>' + esc(m.medicamento) + '</b> — ' + esc(m.dosis) + '</div>' +
     '<label>Motivo</label><textarea id="meMot" placeholder="Indicación médica, efecto adverso, fin de tratamiento..."></textarea><button class="btn blq" id="bME">Confirmar</button>');
-  $('bME').onclick = function () { call('med_estado', { id: m.id, estado: estado, motivo: $('meMot').value }).then(function () { toast('Actualizado', 'ok'); cerrarModal(); cargarFicha(); }); };
+  $('bME').onclick = function () { call('med_estado', { id: m.id, estado: estado, motivo: $('meMot').value }).then(function () { toast('Actualizado', 'ok'); cerrarModal(); cargarFicha(); syncAlarmas(); }); };
 }
 
 function dlgStock(i) {
@@ -778,6 +834,63 @@ function guardarArchivo(d) {
   }
 }
 
+/* ---------- Análisis clínicos ---------- */
+function tabAnalisis(r) {
+  var l = r.analisis || [];
+  if (!l.length) return '<div class="vacio">Sin análisis registrados.' + (puede(P_REG) ? '<br>Tocá <b>+</b> para cargar un análisis con su diagnóstico.' : '') + '</div>';
+  return l.map(function (a, i) {
+    var borde = { CRITICO: 'var(--err)', ALTERADO: 'var(--warn)', NORMAL: 'var(--ok)' }[a.estado] || 'var(--gris)';
+    return '<div class="card med-card" style="border-left:5px solid ' + borde + '"><div class="top"><div><div class="nom">' + esc(a.tipo_estudio) + '</div>' +
+      '<div class="sub">' + fFecha(a.fecha) + (a.laboratorio ? ' · ' + esc(a.laboratorio) : '') + (a.solicitado_por ? ' · Pedido por ' + esc(a.solicitado_por) : '') + '</div></div>' +
+      '<span class="chip ' + a.estado + '">' + a.estado + '</span></div>' +
+      (a.resultado ? '<div style="margin-top:8px"><div class="sub" style="font-weight:700;text-transform:uppercase;font-size:11px">Resultado / valores</div><div style="white-space:pre-wrap;font-size:14px">' + esc(a.resultado) + '</div></div>' : '') +
+      (a.diagnostico ? '<div style="margin-top:8px"><div class="sub" style="font-weight:700;text-transform:uppercase;font-size:11px">Diagnóstico / interpretación</div><div style="white-space:pre-wrap;font-size:14px;font-weight:600">' + esc(a.diagnostico) + '</div></div>' : '') +
+      (a.observaciones ? '<div class="sub" style="margin-top:6px">📝 ' + esc(a.observaciones) + '</div>' : '') +
+      (a.docs && a.docs.length ? '<div class="horas" style="margin-top:10px">' + a.docs.map(function (d) { var c = colorDoc(d.mime); return '<span style="background:' + c[0] + ';color:#fff;cursor:pointer" onclick="verDoc(\'' + d.id + '\')">' + c[1] + ' · ' + esc(String(d.nombre_archivo).substring(0, 28)) + '</span>'; }).join('') + '</div>' : '') +
+      '<div class="sub" style="margin-top:6px">Cargado por ' + esc(a.usuario) + ' · ' + fFecha(a.creado) + '</div>' +
+      '<div class="acciones">' + (puede(P_REG) ? '<button class="btn sm sec" onclick="dlgAnalisis(S.ficha.analisis[' + i + '])">✎ Editar / adjuntar</button>' : '') +
+      (puede(P_CLI) ? '<button class="btn sm lin" onclick="borrarAnalisis(\'' + a.id + '\')">Eliminar</button>' : '') + '</div></div>';
+  }).join('');
+}
+
+function dlgAnalisis(a) {
+  a = a || {};
+  var v = function (k) { return esc(a[k] || ''); };
+  modal(a.id ? 'Editar análisis' : 'Nuevo análisis clínico',
+    '<label>Tipo de estudio *</label><input id="aTipo" list="lTipos" value="' + v('tipo_estudio') + '" placeholder="Elegí o escribí"><datalist id="lTipos">' + TIPOS_ANALISIS.map(function (t) { return '<option value="' + t + '">'; }).join('') + '</datalist>' +
+    '<div class="fila"><div><label>Fecha</label><input id="aFec" type="date" value="' + (a.fecha || hoyStr()) + '"></div><div><label>Estado</label><select id="aEst"><option value="PENDIENTE">Pendiente de resultado</option><option value="NORMAL">Normal</option><option value="ALTERADO">Alterado</option><option value="CRITICO">Crítico</option></select></div></div>' +
+    '<div class="fila"><div><label>Laboratorio / centro</label><input id="aLab" value="' + v('laboratorio') + '"></div><div><label>Solicitado por</label><input id="aSol" value="' + v('solicitado_por') + '"></div></div>' +
+    '<label>Resultado / valores</label><textarea id="aRes" placeholder="Ej: Hb 10,2 g/dL · Glucemia 182 mg/dL">' + v('resultado') + '</textarea>' +
+    '<label>Diagnóstico / interpretación</label><textarea id="aDx" placeholder="Ej: Anemia leve. Hiperglucemia en ayunas.">' + v('diagnostico') + '</textarea>' +
+    '<label>Observaciones / conducta</label><textarea id="aObs" placeholder="Ej: Control en 30 días, ajustar dosis…">' + v('observaciones') + '</textarea>' +
+    '<label>Adjuntar archivos (PDF o fotos del informe)</label><input id="aFile" type="file" multiple accept="image/*,application/pdf">' +
+    (a.docs && a.docs.length ? '<div style="margin-top:6px;font-size:12px;color:var(--gris)">Ya tiene ' + a.docs.length + ' archivo(s); los nuevos se suman.</div>' : '') +
+    '<div id="aProg" style="font-size:13px;color:var(--gris);margin-top:8px"></div>' +
+    '<button class="btn blq" id="bAn">Guardar análisis</button>');
+  $('aEst').value = a.estado || 'PENDIENTE';
+  $('bAn').onclick = function () {
+    $('bAn').disabled = true;
+    call('analisis_guardar', { id: a.id || '', paciente_id: S.pac, tipo_estudio: $('aTipo').value, fecha: $('aFec').value, estado: $('aEst').value,
+      laboratorio: $('aLab').value, solicitado_por: $('aSol').value, resultado: $('aRes').value, diagnostico: $('aDx').value, observaciones: $('aObs').value })
+      .then(function (r) {
+        var files = Array.prototype.slice.call($('aFile').files || []), i = 0;
+        var sig = function () {
+          if (i >= files.length) { toast('Análisis guardado ✓', 'ok'); cerrarModal(); S.tab = 'analisis'; cargarFicha(); return; }
+          var f = files[i++];
+          $('aProg').textContent = 'Subiendo ' + i + ' de ' + files.length + ': ' + f.name + '…';
+          leerArchivo(f).then(function (x) {
+            return call('doc_subir', { paciente_id: S.pac, analisis_id: r.id, tipo: 'ESTUDIO DE LABORATORIO', descripcion: $('aTipo').value + ' ' + $('aFec').value,
+              fecha_doc: $('aFec').value, nombre: x.nombre, mime: x.mime, b64: x.b64 }, true);
+          }).then(sig).catch(function (e) { toast(e.message, 'err'); sig(); });
+        };
+        sig();
+      }).catch(function () { $('bAn').disabled = false; });
+  };
+}
+function borrarAnalisis(id) {
+  if (confirm('¿Eliminar este análisis y sus archivos adjuntos?')) call('analisis_eliminar', { id: id }).then(function () { toast('Análisis eliminado', 'ok'); cargarFicha(); });
+}
+
 function borrarDoc(id) { if (confirm('¿Eliminar este documento? Se enviará a la papelera de Drive.')) call('doc_eliminar', { id: id }).then(function () { toast('Documento eliminado', 'ok'); cargarFicha(); }); }
 
 function fichaPdf() { call('ficha_pdf', { id: S.pac }).then(function (d) { guardarArchivo(d); toast('Ficha generada ✓', 'ok'); }); }
@@ -804,13 +917,27 @@ function dlgUsuario(u) {
     '<label>Nombre completo</label><input id="uN" value="' + esc(u.nombre || '') + '">' +
     '<label>Usuario</label><input id="uU" autocapitalize="none" value="' + esc(u.usuario || '') + '">' +
     '<label>Rol</label><select id="uR">' + Object.keys(ROL_TXT).map(function (k) { return '<option value="' + k + '">' + ROL_TXT[k] + '</option>'; }).join('') + '</select>' +
+    '<div id="wPac" class="oculto"><label>Paciente vinculado</label><select id="uP"><option value="">Cargando…</option></select></div>' +
     '<label>Estado</label><select id="uA"><option value="SI">Activo</option><option value="NO">Inactivo</option></select>' +
     '<label>' + (u.id ? 'Nueva clave (dejar vacío para no cambiar)' : 'Clave') + '</label><input id="uC" type="password" autocomplete="new-password">' +
-    '<p style="font-size:12px;color:var(--gris)"><b>Profesional:</b> carga y modifica medicación. <b>Cuidador:</b> registra tomas, signos y documentos. <b>Consulta:</b> solo ve.</p>' +
+    '<p style="font-size:12px;color:var(--gris)"><b>Profesional:</b> carga y modifica medicación. <b>Cuidador:</b> registra tomas, signos y documentos. <b>Consulta:</b> solo ve. <b>Paciente:</b> ve solo su ficha y medicación, marca sus tomas y recibe los recordatorios en su celular.</p>' +
     '<button class="btn blq" id="bU">Guardar</button>');
   $('uR').value = u.rol || 'CUIDADOR'; $('uA').value = u.activo || 'SI';
+  var cargados = false;
+  var verPac = function () {
+    var es = $('uR').value === 'PACIENTE';
+    $('wPac').classList.toggle('oculto', !es);
+    if (es && !cargados) {
+      cargados = true;
+      call('pacientes_listar', { estado: 'TODOS' }, true).then(function (l) {
+        $('uP').innerHTML = '<option value="">— Elegí el paciente —</option>' + l.map(function (p) { return '<option value="' + p.id + '">' + esc(p.apellidos + ', ' + p.nombres) + (p.ci ? ' · CI ' + esc(p.ci) : '') + '</option>'; }).join('');
+        $('uP').value = u.paciente_id || '';
+      });
+    }
+  };
+  $('uR').onchange = verPac; verPac();
   $('bU').onclick = function () {
-    call('usuario_guardar', { id: u.id || '', nombre: $('uN').value, usuario: $('uU').value, rol: $('uR').value, activo: $('uA').value, clave: $('uC').value })
+    call('usuario_guardar', { id: u.id || '', nombre: $('uN').value, usuario: $('uU').value, rol: $('uR').value, activo: $('uA').value, clave: $('uC').value, paciente_id: $('uP').value })
       .then(function () { toast('Usuario guardado ✓', 'ok'); cerrarModal(); vUsuarios(); });
   };
 }
@@ -821,11 +948,18 @@ function dlgUsuario(u) {
 function vCuenta() {
   $('titulo').textContent = 'Mi cuenta';
   $('vista').innerHTML = '<div class="card"><div class="pac-item"><div class="avatar">' + esc(S.user.nombre.charAt(0)) + '</div><div class="inf"><div class="nom">' + esc(S.user.nombre) + '</div><div class="sub">@' + esc(S.user.usuario) + ' · ' + ROL_TXT[S.user.rol] + '</div></div></div></div>' +
+    '<div class="card"><h3 style="font-size:18px;color:var(--pri2)">🔔 Notificaciones</h3>' +
+    (enApp()
+      ? '<div class="switch"><span>Recordatorios de medicación en este celular' + (esPaciente() ? '' : ' (todos los pacientes activos)') + '</span><input type="checkbox" id="swN"' + (notifActivas() ? ' checked' : '') + '></div>' +
+        '<p style="font-size:12px;color:var(--gris);margin:4px 0 0">Suena a la hora de cada toma y vuelve a avisar a los 30 min si no se registró. Se programan los próximos 3 días: abrí la app al menos cada 2 días para mantenerlos al día.</p>' +
+        '<button class="btn blq sec" onclick="window.flutter_inappwebview.callHandler(\'probarNotificacion\')">Probar notificación</button>'
+      : '<p style="font-size:13px;color:var(--gris)">Las notificaciones funcionan en la app instalada en el celular (APK).</p>') + '</div>' +
     '<div class="card"><h3 style="font-size:18px;color:var(--pri2)">Cambiar clave</h3>' +
     '<label>Clave actual</label><input id="cA" type="password"><label>Nueva clave</label><input id="cN" type="password" autocomplete="new-password"><label>Repetir nueva clave</label><input id="cR" type="password" autocomplete="new-password">' +
     '<button class="btn blq" id="bCC">Actualizar clave</button></div>' +
     '<button class="btn blq err" onclick="if(confirm(\'¿Cerrar sesión?\'))salir()">Cerrar sesión</button>' +
-    '<p style="text-align:center;font-size:11px;color:var(--gris);margin-top:24px">MediControl v1.0 · SOLUCIONES INNOVATE<br>Transformando el futuro hoy</p>';
+    '<p style="text-align:center;font-size:11px;color:var(--gris);margin-top:24px">MediControl v1.1 · SOLUCIONES INNOVATE<br>Transformando el futuro hoy</p>';
+  if ($('swN')) $('swN').onchange = function () { store('mc_notif', this.checked ? 'SI' : 'NO'); syncAlarmas(); toast(this.checked ? 'Recordatorios activados' : 'Recordatorios desactivados', 'ok'); };
   $('bCC').onclick = function () {
     if ($('cN').value !== $('cR').value) return toast('Las claves nuevas no coinciden', 'err');
     call('cambiar_clave', { actual: $('cA').value, nueva: $('cN').value }).then(function () { toast('Clave actualizada ✓', 'ok'); vCuenta(); });

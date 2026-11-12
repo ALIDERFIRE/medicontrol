@@ -1,0 +1,854 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>MediControl</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<style>
+:root{
+  --pri:#0E7C86;--pri2:#0A5F67;--pri-l:#E3F4F5;--acc:#E2680C;--ok:#1E9E5A;--ok-l:#E4F6EC;
+  --warn:#D99000;--warn-l:#FFF4DC;--err:#C62839;--err-l:#FDE7EA;--gris:#6B7780;--borde:#DDE4E8;
+  --fondo:#F3F6F8;--card:#FFFFFF;--txt:#1C2830;--sombra:0 2px 10px rgba(16,40,52,.08);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:var(--fondo);color:var(--txt);font-family:'Barlow',system-ui,sans-serif;font-size:15px}
+h1,h2,h3,.cond{font-family:'Barlow Condensed',sans-serif;letter-spacing:.3px;margin:0}
+button{font-family:inherit}
+.oculto{display:none!important}
+
+/* ---------- LOGIN ---------- */
+#login{min-height:100%;display:flex;align-items:center;justify-content:center;padding:24px;
+  background:linear-gradient(160deg,#0A5F67 0%,#0E7C86 55%,#13A0AB 100%)}
+.login-box{background:#fff;border-radius:18px;padding:30px 24px;width:100%;max-width:360px;box-shadow:0 12px 40px rgba(0,0,0,.25)}
+.logo{display:flex;align-items:center;gap:10px;margin-bottom:20px}
+.logo .ic{width:46px;height:46px;border-radius:12px;background:var(--pri);display:flex;align-items:center;justify-content:center}
+.logo h1{font-size:28px;color:var(--pri2)}
+.logo small{display:block;color:var(--gris);font-size:12px}
+
+/* ---------- FORM ---------- */
+label{display:block;font-size:12px;font-weight:600;color:var(--gris);margin:10px 0 4px;text-transform:uppercase;letter-spacing:.4px}
+input,select,textarea{width:100%;padding:11px 12px;border:1.5px solid var(--borde);border-radius:10px;font:inherit;background:#fff;color:var(--txt)}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--pri)}
+textarea{min-height:70px;resize:vertical}
+.fila{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.fila3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+.btn{border:none;border-radius:10px;padding:11px 16px;font-weight:600;font-size:14px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;background:var(--pri);color:#fff}
+.btn:active{transform:scale(.97)}
+.btn.blq{width:100%;margin-top:16px;padding:13px}
+.btn.sec{background:var(--pri-l);color:var(--pri2)}
+.btn.ok{background:var(--ok)}.btn.err{background:var(--err)}.btn.warn{background:var(--warn)}
+.btn.lin{background:transparent;border:1.5px solid var(--borde);color:var(--txt)}
+.btn.sm{padding:7px 11px;font-size:13px;border-radius:8px}
+.btn[disabled]{opacity:.5;pointer-events:none}
+
+/* ---------- APP ---------- */
+header{position:sticky;top:0;z-index:20;background:var(--pri);color:#fff;padding:12px 16px;display:flex;align-items:center;gap:10px;box-shadow:0 2px 8px rgba(0,0,0,.15)}
+header h1{font-size:22px;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+header .back{background:rgba(255,255,255,.15);border:none;color:#fff;width:36px;height:36px;border-radius:10px;font-size:20px;cursor:pointer}
+header .usr{font-size:12px;text-align:right;opacity:.9;line-height:1.2}
+main{padding:14px 14px 90px;max-width:900px;margin:0 auto}
+nav.tabbar{position:fixed;bottom:0;left:0;right:0;z-index:20;background:#fff;border-top:1px solid var(--borde);display:flex;justify-content:space-around;padding:6px 4px calc(6px + env(safe-area-inset-bottom))}
+nav.tabbar button{background:none;border:none;color:var(--gris);font-size:11px;font-weight:600;display:flex;flex-direction:column;align-items:center;gap:2px;padding:4px 10px;cursor:pointer;flex:1}
+nav.tabbar button svg{width:24px;height:24px}
+nav.tabbar button.on{color:var(--pri)}
+
+.card{background:var(--card);border-radius:14px;box-shadow:var(--sombra);padding:14px;margin-bottom:12px}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px}
+.stat{background:#fff;border-radius:12px;padding:10px 6px;text-align:center;box-shadow:var(--sombra);border-top:4px solid var(--pri)}
+.stat b{display:block;font-family:'Barlow Condensed';font-size:26px;line-height:1}
+.stat span{font-size:11px;color:var(--gris);font-weight:600;text-transform:uppercase}
+.stat.ok{border-color:var(--ok)}.stat.warn{border-color:var(--warn)}.stat.err{border-color:var(--err)}
+.barra{display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap}
+.barra input,.barra select{flex:1;min-width:120px}
+.titsec{display:flex;align-items:center;justify-content:space-between;margin:16px 2px 8px}
+.titsec h2{font-size:19px;color:var(--pri2)}
+
+.hora-grupo{margin-bottom:10px}
+.hora-tit{font-family:'Barlow Condensed';font-size:20px;color:var(--pri2);margin:12px 4px 6px;display:flex;align-items:center;gap:8px}
+.hora-tit:after{content:'';flex:1;height:1px;background:var(--borde)}
+.toma{background:#fff;border-radius:12px;padding:12px;margin-bottom:8px;box-shadow:var(--sombra);border-left:5px solid var(--gris);display:flex;gap:10px;align-items:center}
+.toma.PENDIENTE{border-color:var(--pri)}
+.toma.ATRASADA{border-color:var(--err);background:var(--err-l)}
+.toma.ADMINISTRADA{border-color:var(--ok);opacity:.8}
+.toma.OMITIDA,.toma.RECHAZADA{border-color:var(--warn);opacity:.85}
+.toma .inf{flex:1;min-width:0}
+.toma .pac{font-size:12px;color:var(--gris);font-weight:600;text-transform:uppercase}
+.toma .med{font-weight:700;font-size:16px}
+.toma .det{font-size:13px;color:var(--gris)}
+.toma .acc{display:flex;gap:6px;flex-shrink:0}
+.ib{width:42px;height:42px;border-radius:12px;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:18px}
+.ib.ok{background:var(--ok);color:#fff}.ib.no{background:var(--warn-l);color:var(--warn)}.ib.gr{background:var(--fondo);color:var(--gris)}
+
+.chip{display:inline-block;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;background:var(--fondo);color:var(--gris)}
+.chip.ACTIVO,.chip.ADMINISTRADA{background:var(--ok-l);color:var(--ok)}
+.chip.PENDIENTE{background:var(--pri-l);color:var(--pri2)}
+.chip.ATRASADA,.chip.SUSPENDIDO,.chip.INACTIVO{background:var(--err-l);color:var(--err)}
+.chip.OMITIDA,.chip.RECHAZADA,.chip.ALTA{background:var(--warn-l);color:var(--warn)}
+.alergia{background:var(--err-l);color:var(--err);border-radius:10px;padding:8px 12px;font-weight:600;font-size:13px;margin-top:8px}
+
+.pac-item{display:flex;align-items:center;gap:12px;cursor:pointer}
+.avatar{width:46px;height:46px;border-radius:50%;background:var(--pri-l);color:var(--pri2);display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed';font-size:19px;flex-shrink:0}
+.pac-item .inf{flex:1;min-width:0}
+.pac-item .nom{font-weight:700}
+.pac-item .sub{font-size:13px;color:var(--gris);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+.ficha-head{display:flex;gap:14px;align-items:center}
+.ficha-head .avatar{width:60px;height:60px;font-size:24px}
+.ficha-head h2{font-size:22px}
+.tabs{display:flex;gap:6px;overflow-x:auto;margin:12px 0;padding-bottom:4px;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tabs button{border:none;background:#fff;color:var(--gris);padding:9px 14px;border-radius:20px;font-weight:600;font-size:13px;white-space:nowrap;cursor:pointer;box-shadow:var(--sombra)}
+.tabs button.on{background:var(--pri);color:#fff}
+.dl{display:grid;grid-template-columns:140px 1fr;gap:6px 12px;font-size:14px}
+.dl dt{color:var(--gris);font-weight:600;font-size:12px;text-transform:uppercase;padding-top:2px}
+.dl dd{margin:0;white-space:pre-wrap;word-break:break-word}
+.med-card .top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.med-card .nom{font-weight:700;font-size:16px}
+.med-card .sub{font-size:13px;color:var(--gris);margin-top:2px}
+.horas{display:flex;flex-wrap:wrap;gap:4px;margin-top:8px}
+.horas span{background:var(--pri-l);color:var(--pri2);font-weight:700;font-size:12px;padding:3px 8px;border-radius:6px}
+.acciones{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+table.t{width:100%;border-collapse:collapse;font-size:13px}
+table.t th{background:var(--fondo);text-align:left;padding:8px;font-size:11px;text-transform:uppercase;color:var(--gris)}
+table.t td{padding:8px;border-bottom:1px solid var(--borde);vertical-align:top}
+.tscroll{overflow-x:auto}
+.doc{display:flex;gap:12px;align-items:center;cursor:pointer}
+.doc .icd{width:46px;height:46px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:11px;color:#fff;flex-shrink:0}
+.doc .inf{flex:1;min-width:0}
+.doc .nom{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.doc .sub{font-size:12px;color:var(--gris)}
+.vacio{text-align:center;color:var(--gris);padding:30px 10px;font-size:14px}
+.fab{position:fixed;right:18px;bottom:84px;z-index:25;width:56px;height:56px;border-radius:50%;background:var(--acc);color:#fff;border:none;font-size:30px;box-shadow:0 6px 18px rgba(226,104,12,.45);cursor:pointer}
+
+/* ---------- MODAL ---------- */
+.modal{position:fixed;inset:0;background:rgba(10,30,40,.55);z-index:50;display:flex;align-items:flex-end;justify-content:center}
+.modal .box{background:#fff;width:100%;max-width:640px;max-height:92vh;overflow-y:auto;border-radius:18px 18px 0 0;padding:18px 16px calc(18px + env(safe-area-inset-bottom));animation:sube .2s ease}
+@media(min-width:700px){.modal{align-items:center}.modal .box{border-radius:18px}}
+@keyframes sube{from{transform:translateY(40px);opacity:0}to{transform:none;opacity:1}}
+.modal .mh{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.modal .mh h3{font-size:21px;color:var(--pri2)}
+.modal .x{background:var(--fondo);border:none;width:34px;height:34px;border-radius:50%;font-size:18px;cursor:pointer}
+.sep{font-family:'Barlow Condensed';color:var(--pri2);font-size:16px;margin:16px 0 0;padding-bottom:4px;border-bottom:2px solid var(--pri-l)}
+#visor .box{max-width:900px;height:92vh;display:flex;flex-direction:column}
+#visorCont{flex:1;overflow:auto;background:#525659;border-radius:10px;padding:8px;text-align:center}
+#visorCont img,#visorCont canvas{max-width:100%;margin:0 auto 8px;display:block;background:#fff}
+
+/* ---------- TOAST / LOADER ---------- */
+#toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:#1C2830;color:#fff;padding:11px 18px;border-radius:10px;z-index:90;font-size:14px;max-width:90%;text-align:center;box-shadow:0 6px 20px rgba(0,0,0,.3);transition:opacity .3s}
+#toast.err{background:var(--err)}#toast.ok{background:var(--ok)}
+#loader{position:fixed;inset:0;background:rgba(255,255,255,.6);z-index:80;display:flex;align-items:center;justify-content:center}
+.spin{width:44px;height:44px;border:4px solid var(--pri-l);border-top-color:var(--pri);border-radius:50%;animation:gira .8s linear infinite}
+@keyframes gira{to{transform:rotate(360deg)}}
+@media(max-width:420px){.stats{grid-template-columns:repeat(2,1fr)}.dl{grid-template-columns:1fr}.dl dt{padding-top:6px}.fila3{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+
+<!-- ================= LOGIN ================= -->
+<section id="login">
+  <div class="login-box">
+    <div class="logo">
+      <div class="ic"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"><rect x="3" y="8" width="18" height="8" rx="4" transform="rotate(-45 12 12)"/><line x1="9.2" y1="9.2" x2="14.8" y2="14.8"/></svg></div>
+      <div><h1>MediControl</h1><small>Control de medicación y ficha médica</small></div>
+    </div>
+    <form id="fLogin" autocomplete="on">
+      <label>Usuario</label><input id="lUsr" autocomplete="username" autocapitalize="none" required>
+      <label>Clave</label><input id="lPwd" type="password" autocomplete="current-password" required>
+      <button class="btn blq" type="submit">Ingresar</button>
+    </form>
+    <p style="text-align:center;font-size:11px;color:var(--gris);margin:18px 0 0">SOLUCIONES INNOVATE · Transformando el futuro hoy</p>
+  </div>
+</section>
+
+<!-- ================= APP ================= -->
+<section id="app" class="oculto">
+  <header>
+    <button class="back oculto" id="btnBack" onclick="volver()">‹</button>
+    <h1 id="titulo">Hoy</h1>
+    <div class="usr"><div id="uNom"></div><div id="uRol" style="opacity:.75"></div></div>
+  </header>
+  <main id="vista"></main>
+  <button class="fab oculto" id="fab">+</button>
+  <nav class="tabbar">
+    <button data-v="hoy" onclick="ir('hoy')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Hoy</button>
+    <button data-v="pacientes" onclick="ir('pacientes')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.5 3.4-5.5 6.5-5.5s5.7 2 6.5 5.5"/><path d="M16 4.5a3.5 3.5 0 010 7M18.5 14.8c1.6.8 2.7 2.6 3 5.2"/></svg>Pacientes</button>
+    <button data-v="usuarios" id="navUsr" onclick="ir('usuarios')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l8 3v6c0 4.5-3.4 8-8 9-4.6-1-8-4.5-8-9V6z"/><path d="M9 12l2 2 4-4"/></svg>Usuarios</button>
+    <button data-v="cuenta" onclick="ir('cuenta')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4.2-6 8-6s7 2 8 6"/></svg>Cuenta</button>
+  </nav>
+</section>
+
+<!-- ================= MODALES ================= -->
+<div class="modal oculto" id="modal"><div class="box"><div class="mh"><h3 id="mTit"></h3><button class="x" onclick="cerrarModal()">✕</button></div><div id="mCont"></div></div></div>
+<div class="modal oculto" id="visor"><div class="box"><div class="mh"><h3 id="vTit" style="font-size:17px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:70%"></h3><div style="display:flex;gap:6px"><button class="btn sm sec" id="vDesc">⬇ Guardar</button><button class="x" onclick="cerrarVisor()">✕</button></div></div><div id="visorCont"></div></div></div>
+<div id="toast" class="oculto"></div>
+<div id="loader" class="oculto"><div class="spin"></div></div>
+
+<script>
+/* =========================================================
+   ESTADO Y UTILIDADES
+   ========================================================= */
+var S = { token: null, user: null, vista: 'hoy', fecha: null, filtroPac: '', pac: null, ficha: null, tab: 'datos', pila: [] };
+var ROL_TXT = { ADMIN: 'Administrador', PROFESIONAL: 'Profesional de salud', CUIDADOR: 'Cuidador / Enfermería', CONSULTA: 'Solo consulta' };
+var TIPOS_DOC = ['ESTUDIO DE LABORATORIO', 'RECETA', 'IMAGEN (RX/ECO/TAC/RM)', 'INFORME MÉDICO', 'EPICRISIS', 'CONSENTIMIENTO', 'DOCUMENTO DE IDENTIDAD', 'SEGURO / CARNET', 'OTRO'];
+var VIAS = ['ORAL', 'SUBLINGUAL', 'INTRAVENOSA (IV)', 'INTRAMUSCULAR (IM)', 'SUBCUTÁNEA (SC)', 'INHALATORIA', 'TÓPICA', 'OFTÁLMICA', 'ÓTICA', 'NASAL', 'RECTAL', 'TRANSDÉRMICA', 'SONDA'];
+var FRECS = [[0, 'A demanda (SOS)'], [1, 'Cada 1 h'], [2, 'Cada 2 h'], [3, 'Cada 3 h'], [4, 'Cada 4 h'], [6, 'Cada 6 h'], [8, 'Cada 8 h'], [12, 'Cada 12 h'], [24, '1 vez al día'], [48, 'Cada 2 días'], [72, 'Cada 3 días'], [168, '1 vez por semana']];
+
+function $(id) { return document.getElementById(id); }
+function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+function hoyStr() { var d = new Date(); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
+function ahoraLocal() { var d = new Date(); return hoyStr() + 'T' + ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2); }
+function fFecha(s) { if (!s) return '—'; var p = String(s).substring(0, 10).split('-'); return p.length === 3 ? p[2] + '/' + p[1] + '/' + p[0] + String(s).substring(10) : s; }
+function iniciales(n, a) { return ((a || '').charAt(0) + (n || '').charAt(0)).toUpperCase(); }
+function frecTxt(f) { f = Number(f) || 0; var x = FRECS.filter(function (r) { return r[0] === f; })[0]; return x ? x[1] : 'Cada ' + f + ' h'; }
+function puede(roles) { return S.user && roles.indexOf(S.user.rol) >= 0; }
+var P_REG = ['ADMIN', 'PROFESIONAL', 'CUIDADOR'], P_CLI = ['ADMIN', 'PROFESIONAL'];
+
+function store(k, v) { try { if (v === undefined) return localStorage.getItem(k); if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) { return null; } }
+
+function toast(msg, tipo) {
+  var t = $('toast'); t.textContent = msg; t.className = tipo || ''; clearTimeout(t._h);
+  t._h = setTimeout(function () { t.className = 'oculto'; }, tipo === 'err' ? 4500 : 2600);
+}
+var cargas = 0;
+function loading(on) { cargas += on ? 1 : -1; if (cargas < 0) cargas = 0; $('loader').classList.toggle('oculto', cargas === 0); }
+
+/* =========================================================
+   CONEXIÓN CON LA API (Apps Script)
+   >>> Pegá acá tu URL /exec <<<
+   ========================================================= */
+var API_URL = 'https://script.google.com/macros/s/AKfycbzhMTxEDUhaquD50I_cc3tyIGTLNffi_cOS7d0JfGX4g7CZQd2gUsOMr2BY3O0VD2Eydw/exec';
+
+/** POST text/plain (sin preflight CORS) → JSON */
+function gs(fn, args) {
+  return fetch(API_URL, {
+    method: 'POST', redirect: 'follow',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify({ fn: fn, args: args || [] })
+  }).then(function (r) {
+    if (!r.ok) throw new Error('Servidor respondió ' + r.status);
+    return r.text();
+  }).then(function (t) {
+    try { return JSON.parse(t); } catch (e) { throw new Error('Respuesta inválida del servidor. Revisá la implementación de Apps Script.'); }
+  }, function (e) {
+    throw new Error(navigator.onLine === false ? 'Sin conexión a internet' : (e.message || 'No se pudo conectar con el servidor'));
+  });
+}
+
+function call(accion, datos, silencioso) {
+  if (!silencioso) loading(true);
+  return gs('api', [S.token, accion, datos || {}]).then(function (r) {
+    if (!silencioso) loading(false);
+    if (r && r.ok) return r.data;
+    if (r && r.auth) salir(true);
+    var m = (r && r.error) || 'Error desconocido';
+    toast(m, 'err'); throw new Error(m);
+  }, function (e) {
+    if (!silencioso) loading(false);
+    toast(e.message, 'err'); throw e;
+  });
+}
+
+/* =========================================================
+   LOGIN / SESIÓN
+   ========================================================= */
+$('fLogin').addEventListener('submit', function (ev) {
+  ev.preventDefault();
+  loading(true);
+  gs('login', [$('lUsr').value, $('lPwd').value]).then(function (r) {
+    loading(false);
+    if (!r.ok) return toast(r.error, 'err');
+    S.token = r.token; S.user = r.user;
+    store('mc_token', r.token); store('mc_user', JSON.stringify(r.user));
+    entrar();
+    if (r.debeCambiar) setTimeout(function () { toast('Por seguridad, cambiá la clave inicial', 'err'); ir('cuenta'); }, 600);
+  }, function (e) { loading(false); toast(e.message, 'err'); });
+});
+
+function entrar() {
+  $('login').classList.add('oculto'); $('app').classList.remove('oculto');
+  $('uNom').textContent = S.user.nombre; $('uRol').textContent = ROL_TXT[S.user.rol] || S.user.rol;
+  $('navUsr').classList.toggle('oculto', S.user.rol !== 'ADMIN');
+  S.fecha = hoyStr();
+  ir('hoy');
+}
+
+function salir(vencida) {
+  if (S.token && !vencida) gs('logout', [S.token]).catch(function () {});
+  S.token = null; S.user = null; store('mc_token', null); store('mc_user', null);
+  $('app').classList.add('oculto'); $('login').classList.remove('oculto'); $('lPwd').value = '';
+  if (vencida) toast('Sesión vencida, ingresá de nuevo', 'err');
+}
+
+(function init() {
+  var t = store('mc_token'), u = store('mc_user');
+  if (t && u) {
+    S.token = t; S.user = JSON.parse(u);
+    loading(true);
+    gs('api', [t, 'ping', {}]).then(function (r) {
+      loading(false);
+      if (r.ok) { S.user = r.data.user; entrar(); } else salir(true);
+    }, function (e) { loading(false); entrar(); toast(e.message, 'err'); });
+  }
+})();
+
+/* =========================================================
+   NAVEGACIÓN
+   ========================================================= */
+function ir(v, conPila) {
+  if (!conPila) S.pila = [];
+  S.vista = v;
+  document.querySelectorAll('nav.tabbar button').forEach(function (b) { b.classList.toggle('on', b.dataset.v === v || (v === 'ficha' && b.dataset.v === 'pacientes')); });
+  $('btnBack').classList.toggle('oculto', S.pila.length === 0);
+  $('fab').classList.add('oculto'); $('fab').onclick = null;
+  window.scrollTo(0, 0);
+  ({ hoy: vHoy, pacientes: vPacientes, ficha: vFicha, usuarios: vUsuarios, cuenta: vCuenta })[v]();
+}
+function volver() { var v = S.pila.pop() || 'hoy'; ir(v, true); }
+function fab(fn) { if (!fn) return; $('fab').classList.remove('oculto'); $('fab').onclick = fn; }
+
+/* =========================================================
+   VISTA: HOY (agenda de tomas)
+   ========================================================= */
+function vHoy() {
+  $('titulo').textContent = 'Medicación del día';
+  $('vista').innerHTML = '<div class="barra"><button class="btn sm lin" onclick="moverDia(-1)">‹</button><input type="date" id="fDia" value="' + S.fecha + '" onchange="S.fecha=this.value;cargarHoy()"><button class="btn sm lin" onclick="moverDia(1)">›</button><button class="btn sm sec" onclick="S.fecha=hoyStr();vHoy()">Hoy</button></div>' +
+    '<div class="barra"><select id="fEstado" onchange="pintarAgenda()"><option value="">Todas las tomas</option><option value="PEND">Pendientes y atrasadas</option><option value="ATRASADA">Solo atrasadas</option><option value="HECHAS">Registradas</option></select></div>' +
+    '<div id="hoyCont"></div>';
+  cargarHoy();
+}
+function moverDia(n) { var d = new Date(S.fecha + 'T12:00:00'); d.setDate(d.getDate() + n); S.fecha = d.toISOString().substring(0, 10); vHoy(); }
+
+var AG = null;
+function cargarHoy(silencioso) {
+  call('dashboard', { fecha: S.fecha }, silencioso).then(function (r) { AG = r; pintarAgenda(); });
+}
+function pintarAgenda() {
+  if (!AG || !$('hoyCont')) return;
+  var c = AG.conteo, f = $('fEstado').value;
+  var h = '<div class="stats">' +
+    '<div class="stat"><b>' + c.total + '</b><span>Tomas</span></div>' +
+    '<div class="stat ok"><b>' + c.ADMINISTRADA + '</b><span>Dadas</span></div>' +
+    '<div class="stat warn"><b>' + c.PENDIENTE + '</b><span>Pendientes</span></div>' +
+    '<div class="stat err"><b>' + c.ATRASADA + '</b><span>Atrasadas</span></div></div>';
+
+  if (AG.stockBajo.length) {
+    h += '<div class="card" style="border-left:5px solid var(--warn)"><b class="cond" style="font-size:17px;color:var(--warn)">⚠ Stock bajo</b>' +
+      AG.stockBajo.map(function (s) { return '<div style="font-size:13px;margin-top:4px">' + esc(s.medicamento) + ' — <b>' + esc(s.stock) + '</b> u. · ' + esc(s.paciente) + '</div>'; }).join('') + '</div>';
+  }
+
+  var lista = AG.agenda.filter(function (t) {
+    if (f === 'PEND') return t.estado === 'PENDIENTE' || t.estado === 'ATRASADA';
+    if (f === 'ATRASADA') return t.estado === 'ATRASADA';
+    if (f === 'HECHAS') return ['ADMINISTRADA', 'OMITIDA', 'RECHAZADA'].indexOf(t.estado) >= 0;
+    return true;
+  });
+  if (!lista.length) h += '<div class="vacio">No hay tomas ' + (f ? 'con ese filtro ' : '') + 'para este día.</div>';
+  var grupo = null;
+  lista.forEach(function (t, i) {
+    if (t.hora !== grupo) { if (grupo !== null) h += '</div>'; grupo = t.hora; h += '<div class="hora-grupo"><div class="hora-tit">' + t.hora + '</div>'; }
+    h += itemToma(t, AG.agenda.indexOf(t));
+  });
+  if (grupo !== null) h += '</div>';
+
+  if (AG.sos.length) {
+    h += '<div class="titsec"><h2>A demanda (SOS)</h2></div>';
+    AG.sos.forEach(function (s, i) {
+      h += '<div class="toma"><div class="inf"><div class="pac">' + esc(s.paciente) + '</div><div class="med">' + esc(s.medicamento) + '</div><div class="det">' + esc(s.dosis + ' · ' + s.via) + (s.indicaciones ? ' · ' + esc(s.indicaciones) : '') + '</div><div class="det">Dadas este día: <b>' + s.dadas + '</b></div></div>' +
+        (puede(P_REG) && AG.esHoy ? '<div class="acc"><button class="btn sm ok" onclick="darSos(' + i + ')">Dar ahora</button></div>' : '') + '</div>';
+    });
+  }
+  $('hoyCont').innerHTML = h;
+}
+
+function itemToma(t, i) {
+  var hecha = ['ADMINISTRADA', 'OMITIDA', 'RECHAZADA'].indexOf(t.estado) >= 0;
+  var acc = '';
+  if (puede(P_REG) && S.fecha <= hoyStr()) {
+    acc = hecha
+      ? '<button class="ib gr" title="Corregir" onclick="dlgToma(' + i + ')">✎</button>'
+      : '<button class="ib no" title="No administrada" onclick="dlgToma(' + i + ')">✕</button><button class="ib ok" title="Administrar" onclick="marcar(' + i + ',\'ADMINISTRADA\')">✓</button>';
+  }
+  return '<div class="toma ' + t.estado + '"><div class="inf"><div class="pac" onclick="abrirFicha(\'' + t.paciente_id + '\')" style="cursor:pointer">' + esc(t.paciente) + '</div>' +
+    '<div class="med">' + esc(t.medicamento) + ' <span class="chip ' + t.estado + '">' + t.estado + '</span></div>' +
+    '<div class="det">' + esc(t.dosis) + ' · ' + esc(t.via) + (t.presentacion ? ' · ' + esc(t.presentacion) : '') + '</div>' +
+    (t.indicaciones ? '<div class="det">📝 ' + esc(t.indicaciones) + '</div>' : '') +
+    (t.alergias ? '<div class="det" style="color:var(--err)">⚠ Alergias: ' + esc(t.alergias) + '</div>' : '') +
+    (hecha ? '<div class="det">✔ ' + esc(t.hora_real) + ' por ' + esc(t.usuario) + (t.observacion ? ' — ' + esc(t.observacion) : '') + '</div>' : '') +
+    '</div><div class="acc">' + acc + '</div></div>';
+}
+
+function marcar(i, estado, obs) {
+  var t = AG.agenda[i];
+  call('toma_registrar', { medicacion_id: t.medicacion_id, fecha: S.fecha, hora_programada: t.hora, estado: estado, observacion: obs || '' })
+    .then(function () { toast(estado === 'ADMINISTRADA' ? 'Toma registrada ✓' : 'Registrado', 'ok'); cerrarModal(); cargarHoy(true); });
+}
+
+function dlgToma(i) {
+  var t = AG.agenda[i];
+  modal('Registrar toma · ' + t.hora,
+    '<div class="card" style="background:var(--fondo);box-shadow:none"><b>' + esc(t.medicamento) + '</b> — ' + esc(t.dosis) + '<br><small>' + esc(t.paciente) + '</small></div>' +
+    '<label>Estado</label><select id="tEst"><option value="ADMINISTRADA">Administrada</option><option value="OMITIDA">Omitida (no se dio)</option><option value="RECHAZADA">Rechazada por el paciente</option></select>' +
+    '<label>Observación</label><textarea id="tObs" placeholder="Motivo, reacción, etc.">' + esc(t.observacion || '') + '</textarea>' +
+    '<button class="btn blq" onclick="marcar(' + i + ',$(\'tEst\').value,$(\'tObs\').value)">Guardar</button>' +
+    (t.toma_id && puede(P_CLI) ? '<button class="btn blq lin" onclick="deshacerToma(\'' + t.toma_id + '\')">Deshacer registro</button>' : ''));
+  if (t.estado !== 'PENDIENTE' && t.estado !== 'ATRASADA') $('tEst').value = t.estado; else $('tEst').value = 'OMITIDA';
+}
+function deshacerToma(id, recargarFicha) {
+  if (!confirm('¿Eliminar este registro de toma?')) return;
+  call('toma_deshacer', { id: id }).then(function () { toast('Registro eliminado', 'ok'); cerrarModal(); if (recargarFicha) cargarFicha(); else cargarHoy(true); });
+}
+function darSos(i) {
+  var s = AG.sos[i];
+  modal('Dar medicación SOS', '<div class="card" style="background:var(--fondo);box-shadow:none"><b>' + esc(s.medicamento) + '</b> — ' + esc(s.dosis) + '<br><small>' + esc(s.paciente) + '</small></div>' +
+    '<label>Motivo / observación</label><textarea id="sObs" placeholder="Ej: dolor 7/10, fiebre 38.5"></textarea>' +
+    '<button class="btn blq ok" id="bSos">Registrar administración</button>');
+  $('bSos').onclick = function () {
+    call('toma_registrar', { medicacion_id: s.medicacion_id, fecha: hoyStr(), estado: 'ADMINISTRADA', observacion: $('sObs').value })
+      .then(function () { toast('Registrado ✓', 'ok'); cerrarModal(); cargarHoy(true); });
+  };
+}
+
+/* =========================================================
+   VISTA: PACIENTES
+   ========================================================= */
+function vPacientes() {
+  $('titulo').textContent = 'Pacientes';
+  $('vista').innerHTML = '<div class="barra"><input id="qPac" placeholder="Buscar por nombre, CI o diagnóstico" value="' + esc(S.filtroPac) + '"><select id="ePac" style="max-width:130px"><option value="ACTIVO">Activos</option><option value="ALTA">De alta</option><option value="INACTIVO">Inactivos</option><option value="TODOS">Todos</option></select></div><div id="lPac"></div>';
+  var tm;
+  $('qPac').oninput = function () { S.filtroPac = this.value; clearTimeout(tm); tm = setTimeout(cargarPacientes, 350); };
+  $('ePac').onchange = cargarPacientes;
+  if (puede(P_REG)) fab(function () { dlgPaciente(null); });
+  cargarPacientes();
+}
+function cargarPacientes() {
+  call('pacientes_listar', { q: $('qPac').value, estado: $('ePac').value }).then(function (l) {
+    if (!l.length) { $('lPac').innerHTML = '<div class="vacio">No hay pacientes' + (puede(P_REG) ? '.<br>Tocá <b>+</b> para cargar uno.' : '.') + '</div>'; return; }
+    $('lPac').innerHTML = l.map(function (p) {
+      return '<div class="card pac-item" onclick="abrirFicha(\'' + p.id + '\')"><div class="avatar">' + iniciales(p.nombres, p.apellidos) + '</div><div class="inf"><div class="nom">' + esc(p.apellidos + ', ' + p.nombres) + '</div>' +
+        '<div class="sub">' + (p.ci ? 'CI ' + esc(p.ci) + ' · ' : '') + (p.edad !== '' ? p.edad + ' años · ' : '') + p.meds + ' med. activas</div>' +
+        (p.diagnosticos ? '<div class="sub">' + esc(p.diagnosticos) + '</div>' : '') +
+        (p.alergias ? '<div class="sub" style="color:var(--err);font-weight:600">⚠ ' + esc(p.alergias) + '</div>' : '') + '</div>' +
+        (p.estado !== 'ACTIVO' ? '<span class="chip ' + p.estado + '">' + p.estado + '</span>' : '<span style="color:var(--gris);font-size:22px">›</span>') + '</div>';
+    }).join('');
+  });
+}
+
+/* =========================================================
+   VISTA: FICHA DEL PACIENTE
+   ========================================================= */
+function abrirFicha(id) {
+  if (S.vista !== 'ficha') { S.pila.push(S.vista); hPush('ficha'); }
+  S.pac = id; S.tab = 'datos';
+  ir('ficha', true);
+}
+function vFicha() {
+  $('titulo').textContent = 'Ficha médica';
+  $('vista').innerHTML = '<div id="fCont"></div>';
+  cargarFicha();
+}
+function cargarFicha() {
+  call('paciente_obtener', { id: S.pac }).then(function (r) { S.ficha = r; pintarFicha(); });
+}
+function pintarFicha() {
+  var r = S.ficha, p = r.paciente;
+  var activas = r.meds.filter(function (m) { return m.estado === 'ACTIVO'; }).length;
+  var h = '<div class="card"><div class="ficha-head"><div class="avatar">' + iniciales(p.nombres, p.apellidos) + '</div><div style="flex:1;min-width:0"><h2>' + esc(p.apellidos + ', ' + p.nombres) + '</h2>' +
+    '<div style="color:var(--gris);font-size:13px">' + (p.ci ? 'CI ' + esc(p.ci) + ' · ' : '') + (p.edad !== '' ? p.edad + ' años · ' : '') + esc(p.sexo || '') + (p.grupo_sanguineo ? ' · Grupo ' + esc(p.grupo_sanguineo) : '') + '</div>' +
+    '<div style="margin-top:4px"><span class="chip ' + p.estado + '">' + p.estado + '</span></div></div></div>' +
+    '<div class="alergia">' + (p.alergias ? '⚠ ALERGIAS: ' + esc(p.alergias) : 'Sin alergias conocidas registradas') + '</div>' +
+    '<div class="acciones">' + (puede(P_REG) ? '<button class="btn sm sec" onclick="dlgPaciente(S.ficha.paciente)">✎ Editar ficha</button>' : '') +
+    '<button class="btn sm sec" onclick="fichaPdf()">⬇ Ficha PDF</button>' +
+    (puede(P_CLI) ? '<button class="btn sm lin" onclick="dlgEstadoPac()">Estado</button>' : '') + '</div></div>';
+
+  var tabs = [['datos', 'Datos'], ['meds', 'Medicación (' + activas + ')'], ['tomas', 'Historial tomas'], ['signos', 'Signos vitales'], ['docs', 'Documentos (' + r.docs.length + ')']];
+  h += '<div class="tabs">' + tabs.map(function (t) { return '<button class="' + (S.tab === t[0] ? 'on' : '') + '" onclick="S.tab=\'' + t[0] + '\';pintarFicha()">' + t[1] + '</button>'; }).join('') + '</div>';
+  h += ({ datos: tabDatos, meds: tabMeds, tomas: tabTomas, signos: tabSignos, docs: tabDocs })[S.tab](r);
+  $('fCont').innerHTML = h;
+
+  $('fab').classList.add('oculto');
+  if (S.tab === 'meds' && puede(P_CLI)) fab(function () { dlgMed(null); });
+  if (S.tab === 'signos' && puede(P_REG)) fab(dlgSignos);
+  if (S.tab === 'docs' && puede(P_REG)) fab(dlgDoc);
+}
+
+function dl(pares) {
+  return '<dl class="dl">' + pares.map(function (x) { return '<dt>' + x[0] + '</dt><dd>' + (x[1] ? esc(x[1]) : '<span style="color:#aab">—</span>') + '</dd>'; }).join('') + '</dl>';
+}
+function tabDatos(r) {
+  var p = r.paciente;
+  return '<div class="card"><div class="sep" style="margin-top:0">Datos personales</div><br>' + dl([
+    ['Fecha nac.', fFecha(p.fecha_nac)], ['Teléfono', p.telefono], ['Dirección', p.direccion],
+    ['Emergencia', [p.contacto_emergencia, p.tel_emergencia].filter(Boolean).join(' · ')],
+    ['Seguro', [p.seguro, p.nro_seguro].filter(Boolean).join(' · Nº ')], ['Médico tratante', p.medico_tratante],
+    ['Peso / Talla', (p.peso || p.talla) ? (p.peso || '—') + ' kg / ' + (p.talla || '—') + ' cm' : '']]) + '</div>' +
+    '<div class="card"><div class="sep" style="margin-top:0">Historia clínica</div><br>' + dl([
+    ['Diagnósticos', p.diagnosticos], ['Antecedentes', p.antecedentes], ['Cirugías', p.cirugias],
+    ['Hábitos', p.habitos], ['Vacunas', p.vacunas], ['Observaciones', p.observaciones]]) + '</div>' +
+    '<div style="font-size:12px;color:var(--gris);text-align:center">Creado ' + fFecha(p.creado) + ' · Actualizado ' + fFecha(p.actualizado) + '</div>';
+}
+
+function tabMeds(r) {
+  if (!r.meds.length) return '<div class="vacio">Sin medicación cargada.' + (puede(P_CLI) ? '<br>Tocá <b>+</b> para agregar.' : '') + '</div>';
+  return r.meds.map(function (m, i) {
+    var bajo = m.stock !== '' && Number(m.stock) <= 5;
+    return '<div class="card med-card" style="' + (m.estado !== 'ACTIVO' ? 'opacity:.65' : '') + '"><div class="top"><div><div class="nom">' + esc(m.medicamento) + '</div>' +
+      '<div class="sub">' + esc([m.principio_activo, m.presentacion].filter(Boolean).join(' · ')) + '</div></div><span class="chip ' + m.estado + '">' + m.estado + '</span></div>' +
+      '<div style="margin-top:8px;font-size:14px"><b>' + esc(m.dosis) + '</b> · ' + esc(m.via) + ' · ' + frecTxt(m.frecuencia_horas) + '</div>' +
+      '<div class="sub">Desde ' + fFecha(m.fecha_inicio) + (m.fecha_fin ? ' hasta ' + fFecha(m.fecha_fin) : ' · sin fecha de fin') + (m.prescriptor ? ' · Dr/a. ' + esc(m.prescriptor) : '') + '</div>' +
+      (m.indicaciones ? '<div class="sub">📝 ' + esc(m.indicaciones) + '</div>' : '') +
+      (m.stock !== '' ? '<div class="sub" style="' + (bajo ? 'color:var(--err);font-weight:700' : '') + '">Stock: ' + esc(m.stock) + ' unidades' + (bajo ? ' ⚠' : '') + '</div>' : '') +
+      (m.motivo_estado && m.estado !== 'ACTIVO' ? '<div class="sub">Motivo: ' + esc(m.motivo_estado) + '</div>' : '') +
+      (m.horarios && m.horarios.length && m.estado === 'ACTIVO' ? '<div class="horas">' + m.horarios.map(function (x) { return '<span>' + x + '</span>'; }).join('') + '</div>' : '') +
+      '<div class="acciones">' +
+      (puede(P_CLI) ? '<button class="btn sm sec" onclick="dlgMed(S.ficha.meds[' + i + '])">✎ Editar</button>' : '') +
+      (puede(P_REG) && m.stock !== '' ? '<button class="btn sm lin" onclick="dlgStock(' + i + ')">Stock</button>' : '') +
+      (puede(P_CLI) && m.estado === 'ACTIVO' ? '<button class="btn sm lin" onclick="dlgMedEstado(' + i + ',\'SUSPENDIDO\')">Suspender</button><button class="btn sm lin" onclick="dlgMedEstado(' + i + ',\'FINALIZADO\')">Finalizar</button>' : '') +
+      (puede(P_CLI) && m.estado !== 'ACTIVO' ? '<button class="btn sm lin" onclick="dlgMedEstado(' + i + ',\'ACTIVO\')">Reactivar</button>' : '') +
+      '</div></div>';
+  }).join('');
+}
+
+function tabTomas(r) {
+  if (!r.tomas.length) return '<div class="vacio">Todavía no hay tomas registradas.</div>';
+  return '<div class="card tscroll"><table class="t"><tr><th>Fecha</th><th>Prog.</th><th>Real</th><th>Medicamento</th><th>Estado</th><th>Registró</th>' + (puede(P_CLI) ? '<th></th>' : '') + '</tr>' +
+    r.tomas.map(function (t) {
+      return '<tr><td>' + fFecha(t.fecha) + '</td><td>' + esc(t.hora_programada) + '</td><td>' + esc(t.hora_real) + '</td><td>' + esc(t.medicamento) + (t.observacion ? '<br><small style="color:var(--gris)">' + esc(t.observacion) + '</small>' : '') + '</td>' +
+        '<td><span class="chip ' + t.estado + '">' + t.estado + '</span></td><td>' + esc(t.usuario) + '</td>' + (puede(P_CLI) ? '<td><button class="btn sm lin" onclick="deshacerToma(\'' + t.id + '\',true)">✕</button></td>' : '') + '</tr>';
+    }).join('') + '</table></div>';
+}
+
+function tabSignos(r) {
+  if (!r.signos.length) return '<div class="vacio">Sin registros de signos vitales.' + (puede(P_REG) ? '<br>Tocá <b>+</b> para cargar.' : '') + '</div>';
+  return '<div class="card tscroll"><table class="t"><tr><th>Fecha</th><th>PA</th><th>FC</th><th>FR</th><th>T°</th><th>SpO₂</th><th>Gluc.</th><th>Peso</th><th>Dolor</th><th>Obs.</th>' + (puede(P_CLI) ? '<th></th>' : '') + '</tr>' +
+    r.signos.map(function (s) {
+      var fiebre = Number(String(s.temperatura).replace(',', '.')) >= 37.8, hipox = s.spo2 !== '' && Number(s.spo2) < 92;
+      return '<tr><td>' + fFecha(s.fecha_hora) + '<br><small style="color:var(--gris)">' + esc(s.usuario) + '</small></td><td>' + esc(s.presion) + '</td><td>' + esc(s.fc) + '</td><td>' + esc(s.fr) + '</td>' +
+        '<td style="' + (fiebre ? 'color:var(--err);font-weight:700' : '') + '">' + esc(s.temperatura) + '</td><td style="' + (hipox ? 'color:var(--err);font-weight:700' : '') + '">' + esc(s.spo2) + '</td>' +
+        '<td>' + esc(s.glucemia) + '</td><td>' + esc(s.peso) + '</td><td>' + esc(s.dolor) + '</td><td>' + esc(s.observacion) + '</td>' +
+        (puede(P_CLI) ? '<td><button class="btn sm lin" onclick="borrarSignos(\'' + s.id + '\')">✕</button></td>' : '') + '</tr>';
+    }).join('') + '</table></div>';
+}
+
+function colorDoc(m) { m = m || ''; if (m.indexOf('pdf') >= 0) return ['#C62839', 'PDF']; if (m.indexOf('image') === 0) return ['#1E7FD0', 'IMG']; if (m.indexOf('word') >= 0) return ['#2B579A', 'DOC']; if (m.indexOf('sheet') >= 0 || m.indexOf('excel') >= 0) return ['#1E7145', 'XLS']; return ['#6B7780', 'ARCH']; }
+function tabDocs(r) {
+  if (!r.docs.length) return '<div class="vacio">No hay documentos adjuntos.' + (puede(P_REG) ? '<br>Tocá <b>+</b> para subir estudios, recetas, imágenes, etc.' : '') + '</div>';
+  var grupos = {};
+  r.docs.forEach(function (d) { (grupos[d.tipo] = grupos[d.tipo] || []).push(d); });
+  return Object.keys(grupos).sort().map(function (g) {
+    return '<div class="titsec"><h2 style="font-size:16px">' + esc(g) + '</h2></div>' + grupos[g].map(function (d) {
+      var c = colorDoc(d.mime);
+      return '<div class="card doc"><div class="icd" style="background:' + c[0] + '" onclick="verDoc(\'' + d.id + '\')">' + c[1] + '</div><div class="inf" onclick="verDoc(\'' + d.id + '\')"><div class="nom">' + esc(d.descripcion || d.nombre_archivo) + '</div>' +
+        '<div class="sub">' + fFecha(d.fecha_doc) + ' · ' + esc(d.tamano_kb) + ' KB · ' + esc(d.usuario) + '</div><div class="sub">' + esc(d.nombre_archivo) + '</div></div>' +
+        (puede(P_CLI) ? '<button class="ib gr" onclick="borrarDoc(\'' + d.id + '\')">🗑</button>' : '') + '</div>';
+    }).join('');
+  }).join('');
+}
+
+/* ---------- Diálogos de ficha ---------- */
+function dlgPaciente(p) {
+  p = p || {};
+  var v = function (k) { return esc(p[k] || ''); };
+  var sel = function (id, ops, val) { return '<select id="' + id + '"><option value=""></option>' + ops.map(function (o) { return '<option' + (o === val ? ' selected' : '') + '>' + o + '</option>'; }).join('') + '</select>'; };
+  modal(p.id ? 'Editar ficha' : 'Nuevo paciente',
+    '<div class="sep">Identificación</div>' +
+    '<div class="fila"><div><label>Nombres *</label><input id="pNom" value="' + v('nombres') + '"></div><div><label>Apellidos *</label><input id="pApe" value="' + v('apellidos') + '"></div></div>' +
+    '<div class="fila3"><div><label>CI</label><input id="pCi" inputmode="numeric" value="' + v('ci') + '"></div><div><label>Fecha nac.</label><input id="pFn" type="date" value="' + v('fecha_nac') + '"></div><div><label>Sexo</label>' + sel('pSex', ['FEMENINO', 'MASCULINO', 'OTRO'], p.sexo) + '</div></div>' +
+    '<div class="fila3"><div><label>Grupo sang.</label>' + sel('pGs', ['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-'], p.grupo_sanguineo) + '</div><div><label>Peso (kg)</label><input id="pPeso" inputmode="decimal" value="' + v('peso') + '"></div><div><label>Talla (cm)</label><input id="pTalla" inputmode="numeric" value="' + v('talla') + '"></div></div>' +
+    '<div class="sep">Contacto</div>' +
+    '<div class="fila"><div><label>Teléfono</label><input id="pTel" type="tel" value="' + v('telefono') + '"></div><div><label>Dirección</label><input id="pDir" value="' + v('direccion') + '"></div></div>' +
+    '<div class="fila"><div><label>Contacto emergencia</label><input id="pCe" value="' + v('contacto_emergencia') + '"></div><div><label>Tel. emergencia</label><input id="pTe" type="tel" value="' + v('tel_emergencia') + '"></div></div>' +
+    '<div class="fila"><div><label>Seguro / Previsión</label><input id="pSeg" placeholder="IPS, privado..." value="' + v('seguro') + '"></div><div><label>Nº asegurado</label><input id="pNseg" value="' + v('nro_seguro') + '"></div></div>' +
+    '<label>Médico tratante</label><input id="pMed" value="' + v('medico_tratante') + '">' +
+    '<div class="sep">Historia clínica</div>' +
+    '<label style="color:var(--err)">⚠ Alergias</label><input id="pAle" placeholder="Ej: Penicilina, AINES, látex" value="' + v('alergias') + '">' +
+    '<label>Diagnósticos</label><textarea id="pDx">' + v('diagnosticos') + '</textarea>' +
+    '<label>Antecedentes (personales / familiares)</label><textarea id="pAnt">' + v('antecedentes') + '</textarea>' +
+    '<label>Cirugías / internaciones</label><textarea id="pCir">' + v('cirugias') + '</textarea>' +
+    '<label>Hábitos (tabaco, alcohol, dieta, actividad)</label><textarea id="pHab">' + v('habitos') + '</textarea>' +
+    '<label>Vacunas</label><textarea id="pVac">' + v('vacunas') + '</textarea>' +
+    '<label>Observaciones</label><textarea id="pObs">' + v('observaciones') + '</textarea>' +
+    '<button class="btn blq" id="bGP">Guardar</button>');
+  $('bGP').onclick = function () {
+    var d = { id: p.id || '', nombres: $('pNom').value, apellidos: $('pApe').value, ci: $('pCi').value, fecha_nac: $('pFn').value, sexo: $('pSex').value,
+      grupo_sanguineo: $('pGs').value, peso: $('pPeso').value, talla: $('pTalla').value, telefono: $('pTel').value, direccion: $('pDir').value,
+      contacto_emergencia: $('pCe').value, tel_emergencia: $('pTe').value, seguro: $('pSeg').value, nro_seguro: $('pNseg').value, medico_tratante: $('pMed').value,
+      alergias: $('pAle').value, diagnosticos: $('pDx').value, antecedentes: $('pAnt').value, cirugias: $('pCir').value, habitos: $('pHab').value,
+      vacunas: $('pVac').value, observaciones: $('pObs').value };
+    call('paciente_guardar', d).then(function (r) {
+      toast('Ficha guardada ✓', 'ok'); cerrarModal();
+      if (p.id) cargarFicha(); else abrirFicha(r.id);
+    });
+  };
+}
+
+function dlgEstadoPac() {
+  var p = S.ficha.paciente;
+  modal('Estado del paciente', '<label>Estado</label><select id="ePa"><option value="ACTIVO">ACTIVO (en tratamiento)</option><option value="ALTA">ALTA</option><option value="INACTIVO">INACTIVO / Baja</option></select>' +
+    '<p style="font-size:13px;color:var(--gris)">Los pacientes que no están ACTIVOS no aparecen en la agenda del día.</p><button class="btn blq" id="bEP">Guardar</button>');
+  $('ePa').value = p.estado;
+  $('bEP').onclick = function () { call('paciente_estado', { id: p.id, estado: $('ePa').value }).then(function () { toast('Estado actualizado', 'ok'); cerrarModal(); cargarFicha(); }); };
+}
+
+function dlgMed(m) {
+  m = m || {};
+  var v = function (k) { return esc(m[k] || ''); };
+  modal(m.id ? 'Editar medicación' : 'Nueva medicación',
+    '<label>Medicamento (nombre comercial) *</label><input id="mMed" value="' + v('medicamento') + '">' +
+    '<div class="fila"><div><label>Principio activo</label><input id="mPa" value="' + v('principio_activo') + '"></div><div><label>Presentación</label><input id="mPres" placeholder="Comp. 500 mg, jarabe..." value="' + v('presentacion') + '"></div></div>' +
+    '<div class="fila"><div><label>Dosis *</label><input id="mDos" placeholder="1 comp., 10 ml, 2 puff" value="' + v('dosis') + '"></div><div><label>Vía</label><select id="mVia">' + VIAS.map(function (x) { return '<option' + (x === m.via ? ' selected' : '') + '>' + x + '</option>'; }).join('') + '</select></div></div>' +
+    '<div class="fila"><div><label>Frecuencia</label><select id="mFr">' + FRECS.map(function (f) { return '<option value="' + f[0] + '">' + f[1] + '</option>'; }).join('') + '</select></div><div id="wHi"><label>Primera toma</label><input id="mHi" type="time" value="' + (m.hora_inicio || '08:00') + '"></div></div>' +
+    '<div id="prevH" class="horas"></div>' +
+    '<div class="fila"><div><label>Fecha inicio</label><input id="mFi" type="date" value="' + (m.fecha_inicio || hoyStr()) + '"></div><div><label>Fecha fin</label><input id="mFf" type="date" value="' + v('fecha_fin') + '"></div></div>' +
+    '<div class="fila"><div><label>Prescripto por</label><input id="mPr" value="' + v('prescriptor') + '"></div><div><label>Stock (unidades)</label><input id="mSt" inputmode="numeric" placeholder="vacío = no controlar" value="' + v('stock') + '"></div></div>' +
+    '<label>Indicaciones</label><textarea id="mInd" placeholder="Con comidas, en ayunas, diluir...">' + v('indicaciones') + '</textarea>' +
+    (S.ficha.paciente.alergias ? '<div class="alergia">⚠ Paciente alérgico a: ' + esc(S.ficha.paciente.alergias) + '</div>' : '') +
+    '<button class="btn blq" id="bGM">Guardar</button>');
+  if (m.via) $('mVia').value = m.via;
+  $('mFr').value = String(m.frecuencia_horas !== undefined && m.frecuencia_horas !== '' ? Number(m.frecuencia_horas) : 8);
+  if (!$('mFr').value) $('mFr').value = '8';
+  var prev = function () {
+    var f = Number($('mFr').value);
+    $('wHi').style.visibility = f > 0 ? 'visible' : 'hidden';
+    if (f <= 0 || f >= 24) { $('prevH').innerHTML = f >= 24 ? '<span>' + $('mHi').value + '</span>' : ''; return; }
+    var p = $('mHi').value.split(':'), ini = (+p[0]) * 60 + (+p[1]), out = [];
+    for (var t = ini; t < ini + 1440; t += f * 60) { var x = t % 1440; out.push(('0' + Math.floor(x / 60)).slice(-2) + ':' + ('0' + x % 60).slice(-2)); }
+    out.sort(); $('prevH').innerHTML = out.map(function (h) { return '<span>' + h + '</span>'; }).join('');
+  };
+  $('mFr').onchange = prev; $('mHi').onchange = prev; prev();
+  $('bGM').onclick = function () {
+    var d = { id: m.id || '', paciente_id: S.pac, medicamento: $('mMed').value, principio_activo: $('mPa').value, presentacion: $('mPres').value,
+      dosis: $('mDos').value, via: $('mVia').value, frecuencia_horas: $('mFr').value, hora_inicio: $('mHi').value, fecha_inicio: $('mFi').value,
+      fecha_fin: $('mFf').value, prescriptor: $('mPr').value, stock: $('mSt').value.trim(), indicaciones: $('mInd').value };
+    call('med_guardar', d).then(function () { toast('Medicación guardada ✓', 'ok'); cerrarModal(); cargarFicha(); });
+  };
+}
+
+function dlgMedEstado(i, estado) {
+  var m = S.ficha.meds[i];
+  modal({ ACTIVO: 'Reactivar', SUSPENDIDO: 'Suspender', FINALIZADO: 'Finalizar' }[estado] + ' medicación',
+    '<div class="card" style="background:var(--fondo);box-shadow:none"><b>' + esc(m.medicamento) + '</b> — ' + esc(m.dosis) + '</div>' +
+    '<label>Motivo</label><textarea id="meMot" placeholder="Indicación médica, efecto adverso, fin de tratamiento..."></textarea><button class="btn blq" id="bME">Confirmar</button>');
+  $('bME').onclick = function () { call('med_estado', { id: m.id, estado: estado, motivo: $('meMot').value }).then(function () { toast('Actualizado', 'ok'); cerrarModal(); cargarFicha(); }); };
+}
+
+function dlgStock(i) {
+  var m = S.ficha.meds[i];
+  modal('Stock · ' + m.medicamento, '<label>Unidades disponibles</label><input id="stN" type="number" min="0" value="' + esc(m.stock) + '"><p style="font-size:13px;color:var(--gris)">Se descuenta 1 unidad por cada toma administrada.</p><button class="btn blq" id="bSt">Guardar</button>');
+  $('bSt').onclick = function () { call('med_stock', { id: m.id, stock: $('stN').value }).then(function () { toast('Stock actualizado', 'ok'); cerrarModal(); cargarFicha(); }); };
+}
+
+function dlgSignos() {
+  modal('Signos vitales',
+    '<label>Fecha y hora</label><input id="sgF" type="datetime-local" value="' + ahoraLocal() + '">' +
+    '<div class="fila3"><div><label>Presión</label><input id="sgPa" placeholder="120/80"></div><div><label>FC (lpm)</label><input id="sgFc" inputmode="numeric"></div><div><label>FR (rpm)</label><input id="sgFr" inputmode="numeric"></div></div>' +
+    '<div class="fila3"><div><label>Temp. °C</label><input id="sgT" inputmode="decimal"></div><div><label>SpO₂ %</label><input id="sgS" inputmode="numeric"></div><div><label>Glucemia</label><input id="sgG" inputmode="numeric" placeholder="mg/dL"></div></div>' +
+    '<div class="fila"><div><label>Peso (kg)</label><input id="sgP" inputmode="decimal"></div><div><label>Dolor (0-10)</label><input id="sgD" type="number" min="0" max="10"></div></div>' +
+    '<label>Observación</label><textarea id="sgO"></textarea><button class="btn blq" id="bSg">Guardar</button>');
+  $('bSg').onclick = function () {
+    call('signos_guardar', { paciente_id: S.pac, fecha_hora: $('sgF').value, presion: $('sgPa').value, fc: $('sgFc').value, fr: $('sgFr').value,
+      temperatura: $('sgT').value, spo2: $('sgS').value, glucemia: $('sgG').value, peso: $('sgP').value, dolor: $('sgD').value, observacion: $('sgO').value })
+      .then(function () { toast('Signos registrados ✓', 'ok'); cerrarModal(); cargarFicha(); });
+  };
+}
+function borrarSignos(id) { if (confirm('¿Eliminar este registro?')) call('signos_eliminar', { id: id }).then(function () { toast('Eliminado', 'ok'); cargarFicha(); }); }
+
+/* ---------- Documentos ---------- */
+function dlgDoc() {
+  modal('Subir documento',
+    '<label>Tipo</label><select id="dTipo">' + TIPOS_DOC.map(function (t) { return '<option>' + t + '</option>'; }).join('') + '</select>' +
+    '<label>Descripción</label><input id="dDesc" placeholder="Ej: Hemograma completo, Rx tórax">' +
+    '<label>Fecha del documento</label><input id="dFecha" type="date" value="' + hoyStr() + '">' +
+    '<label>Archivo(s) — PDF, foto, Word, Excel (máx. 10 MB c/u)</label><input id="dFile" type="file" multiple accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.txt">' +
+    '<div id="dProg" style="font-size:13px;color:var(--gris);margin-top:8px"></div>' +
+    '<button class="btn blq" id="bDoc">Subir</button>');
+  $('bDoc').onclick = subirDocs;
+}
+
+function leerArchivo(file) {
+  return new Promise(function (ok, mal) {
+    if (file.type.indexOf('image/') === 0 && file.type !== 'image/gif' && file.type !== 'image/svg+xml') {
+      // comprime fotos del celular a máx. 1800 px JPEG
+      var img = new Image(), url = URL.createObjectURL(file);
+      img.onload = function () {
+        var max = 1800, w = img.width, h = img.height, k = Math.min(1, max / Math.max(w, h));
+        var c = document.createElement('canvas'); c.width = Math.round(w * k); c.height = Math.round(h * k);
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        URL.revokeObjectURL(url);
+        var data = c.toDataURL('image/jpeg', 0.82);
+        ok({ nombre: file.name.replace(/\.[^.]+$/, '') + '.jpg', mime: 'image/jpeg', b64: data.split(',')[1] });
+      };
+      img.onerror = function () { URL.revokeObjectURL(url); leerCrudo(file).then(ok, mal); };
+      img.src = url;
+    } else leerCrudo(file).then(ok, mal);
+  });
+}
+function leerCrudo(file) {
+  return new Promise(function (ok, mal) {
+    if (file.size > 10 * 1024 * 1024) return mal(new Error(file.name + ' supera 10 MB'));
+    var r = new FileReader();
+    r.onload = function () { ok({ nombre: file.name, mime: file.type || 'application/octet-stream', b64: String(r.result).split(',')[1] }); };
+    r.onerror = function () { mal(new Error('No se pudo leer ' + file.name)); };
+    r.readAsDataURL(file);
+  });
+}
+
+function subirDocs() {
+  var files = Array.prototype.slice.call($('dFile').files || []);
+  if (!files.length) return toast('Elegí al menos un archivo', 'err');
+  $('bDoc').disabled = true;
+  var i = 0, okN = 0;
+  var sig = function () {
+    if (i >= files.length) {
+      toast(okN + ' documento(s) subido(s) ✓', 'ok'); cerrarModal(); S.tab = 'docs'; cargarFicha(); return;
+    }
+    var f = files[i++];
+    $('dProg').textContent = 'Subiendo ' + i + ' de ' + files.length + ': ' + f.name + '…';
+    leerArchivo(f).then(function (a) {
+      return call('doc_subir', { paciente_id: S.pac, tipo: $('dTipo').value, descripcion: $('dDesc').value + (files.length > 1 ? ' (' + i + ')' : ''),
+        fecha_doc: $('dFecha').value, nombre: a.nombre, mime: a.mime, b64: a.b64 }, true);
+    }).then(function () { okN++; sig(); }).catch(function (e) { toast(e.message, 'err'); sig(); });
+  };
+  sig();
+}
+
+var DOC_ACTUAL = null;
+function verDoc(id) {
+  call('doc_obtener', { id: id }).then(function (d) {
+    DOC_ACTUAL = d;
+    $('vTit').textContent = d.nombre;
+    if ($('visor').classList.contains('oculto')) hPush('visor');
+    $('visor').classList.remove('oculto');
+    var c = $('visorCont'); c.innerHTML = '';
+    if (d.mime.indexOf('image/') === 0) {
+      c.innerHTML = '<img src="data:' + d.mime + ';base64,' + d.b64 + '">';
+    } else if (d.mime === 'application/pdf' && window.pdfjsLib) {
+      renderPdf(d.b64, c);
+    } else {
+      c.innerHTML = '<div style="color:#fff;padding:40px 10px">Vista previa no disponible para este tipo de archivo.<br><br><button class="btn" onclick="guardarArchivo(DOC_ACTUAL)">⬇ Descargar</button>' +
+        '<br><br><a style="color:#9de" href="' + esc(d.url) + '" target="_blank">Abrir en Google Drive</a></div>';
+    }
+  });
+  $('vDesc').onclick = function () { guardarArchivo(DOC_ACTUAL); };
+}
+function cerrarVisor() { $('visor').classList.add('oculto'); $('visorCont').innerHTML = ''; DOC_ACTUAL = null; }
+
+function renderPdf(b64, cont) {
+  try {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    var bin = atob(b64), arr = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+    cont.innerHTML = '<div style="color:#fff;padding:20px">Cargando PDF…</div>';
+    pdfjsLib.getDocument({ data: arr }).promise.then(function (pdf) {
+      cont.innerHTML = '';
+      var ancho = Math.min(cont.clientWidth - 16, 1000);
+      var pag = function (n) {
+        if (n > pdf.numPages) return;
+        pdf.getPage(n).then(function (pg) {
+          var v1 = pg.getViewport({ scale: 1 }), esc2 = (ancho / v1.width) * (window.devicePixelRatio || 1);
+          var vp = pg.getViewport({ scale: esc2 }), cv = document.createElement('canvas');
+          cv.width = vp.width; cv.height = vp.height; cv.style.width = ancho + 'px';
+          cont.appendChild(cv);
+          pg.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise.then(function () { pag(n + 1); });
+        });
+      };
+      pag(1);
+    }).catch(function (e) { cont.innerHTML = '<div style="color:#fff;padding:30px">No se pudo mostrar el PDF (' + esc(e.message) + ').<br><br><button class="btn" onclick="guardarArchivo(DOC_ACTUAL)">⬇ Descargar</button></div>'; });
+  } catch (e) { cont.innerHTML = '<div style="color:#fff;padding:30px">' + esc(e.message) + '</div>'; }
+}
+
+/** Guarda un archivo: en la APK usa el puente nativo; en navegador, descarga directa. */
+function guardarArchivo(d) {
+  if (!d) return;
+  // APK Flutter (HTML local): handler nativo
+  if (window.flutter_inappwebview && window.flutter_inappwebview.callHandler) {
+    window.flutter_inappwebview.callHandler('guardarArchivo', d.nombre, d.mime, d.b64);
+    toast('Abriendo archivo…', 'ok'); return;
+  }
+  if (/MediControlApp/.test(navigator.userAgent) && d.url) { window.open(d.url, '_blank'); return; }
+  try {
+    var bin = atob(d.b64), arr = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+    var url = URL.createObjectURL(new Blob([arr], { type: d.mime }));
+    var a = document.createElement('a'); a.href = url; a.download = d.nombre; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 5000);
+  } catch (e) {
+    if (d.url) window.open(d.url, '_blank'); else toast('No se pudo descargar', 'err');
+  }
+}
+
+function borrarDoc(id) { if (confirm('¿Eliminar este documento? Se enviará a la papelera de Drive.')) call('doc_eliminar', { id: id }).then(function () { toast('Documento eliminado', 'ok'); cargarFicha(); }); }
+
+function fichaPdf() { call('ficha_pdf', { id: S.pac }).then(function (d) { guardarArchivo(d); toast('Ficha generada ✓', 'ok'); }); }
+
+/* =========================================================
+   VISTA: USUARIOS (ADMIN)
+   ========================================================= */
+var USRS = [];
+function vUsuarios() {
+  $('titulo').textContent = 'Usuarios';
+  $('vista').innerHTML = '<div id="lUsr"></div>';
+  fab(function () { dlgUsuario(null); });
+  call('usuarios_listar').then(function (l) {
+    USRS = l;
+    $('lUsr').innerHTML = l.map(function (u, i) {
+      return '<div class="card pac-item" onclick="dlgUsuario(USRS[' + i + '])"><div class="avatar">' + esc(u.nombre.charAt(0)) + '</div><div class="inf"><div class="nom">' + esc(u.nombre) + '</div><div class="sub">@' + esc(u.usuario) + ' · ' + (ROL_TXT[u.rol] || u.rol) + '</div></div>' +
+        '<span class="chip ' + (u.activo === 'SI' ? 'ACTIVO' : 'INACTIVO') + '">' + (u.activo === 'SI' ? 'ACTIVO' : 'INACTIVO') + '</span></div>';
+    }).join('');
+  });
+}
+function dlgUsuario(u) {
+  u = u || {};
+  modal(u.id ? 'Editar usuario' : 'Nuevo usuario',
+    '<label>Nombre completo</label><input id="uN" value="' + esc(u.nombre || '') + '">' +
+    '<label>Usuario</label><input id="uU" autocapitalize="none" value="' + esc(u.usuario || '') + '">' +
+    '<label>Rol</label><select id="uR">' + Object.keys(ROL_TXT).map(function (k) { return '<option value="' + k + '">' + ROL_TXT[k] + '</option>'; }).join('') + '</select>' +
+    '<label>Estado</label><select id="uA"><option value="SI">Activo</option><option value="NO">Inactivo</option></select>' +
+    '<label>' + (u.id ? 'Nueva clave (dejar vacío para no cambiar)' : 'Clave') + '</label><input id="uC" type="password" autocomplete="new-password">' +
+    '<p style="font-size:12px;color:var(--gris)"><b>Profesional:</b> carga y modifica medicación. <b>Cuidador:</b> registra tomas, signos y documentos. <b>Consulta:</b> solo ve.</p>' +
+    '<button class="btn blq" id="bU">Guardar</button>');
+  $('uR').value = u.rol || 'CUIDADOR'; $('uA').value = u.activo || 'SI';
+  $('bU').onclick = function () {
+    call('usuario_guardar', { id: u.id || '', nombre: $('uN').value, usuario: $('uU').value, rol: $('uR').value, activo: $('uA').value, clave: $('uC').value })
+      .then(function () { toast('Usuario guardado ✓', 'ok'); cerrarModal(); vUsuarios(); });
+  };
+}
+
+/* =========================================================
+   VISTA: CUENTA
+   ========================================================= */
+function vCuenta() {
+  $('titulo').textContent = 'Mi cuenta';
+  $('vista').innerHTML = '<div class="card"><div class="pac-item"><div class="avatar">' + esc(S.user.nombre.charAt(0)) + '</div><div class="inf"><div class="nom">' + esc(S.user.nombre) + '</div><div class="sub">@' + esc(S.user.usuario) + ' · ' + ROL_TXT[S.user.rol] + '</div></div></div></div>' +
+    '<div class="card"><h3 style="font-size:18px;color:var(--pri2)">Cambiar clave</h3>' +
+    '<label>Clave actual</label><input id="cA" type="password"><label>Nueva clave</label><input id="cN" type="password" autocomplete="new-password"><label>Repetir nueva clave</label><input id="cR" type="password" autocomplete="new-password">' +
+    '<button class="btn blq" id="bCC">Actualizar clave</button></div>' +
+    '<button class="btn blq err" onclick="if(confirm(\'¿Cerrar sesión?\'))salir()">Cerrar sesión</button>' +
+    '<p style="text-align:center;font-size:11px;color:var(--gris);margin-top:24px">MediControl v1.0 · SOLUCIONES INNOVATE<br>Transformando el futuro hoy</p>';
+  $('bCC').onclick = function () {
+    if ($('cN').value !== $('cR').value) return toast('Las claves nuevas no coinciden', 'err');
+    call('cambiar_clave', { actual: $('cA').value, nueva: $('cN').value }).then(function () { toast('Clave actualizada ✓', 'ok'); vCuenta(); });
+  };
+}
+
+/* =========================================================
+   MODAL
+   ========================================================= */
+/* Botón "atrás" del celular: usa el historial oficial de Apps Script */
+function hPush(v) { try { history.pushState({ v: v }, ''); } catch (e) {} }
+window.addEventListener('popstate', function () {
+  if (!$('visor').classList.contains('oculto')) return cerrarVisor();
+  if (!$('modal').classList.contains('oculto')) return cerrarModal();
+  if (S.pila.length) volver();
+});
+
+function modal(tit, html) { if ($('modal').classList.contains('oculto')) hPush('modal'); $('mTit').textContent = tit; $('mCont').innerHTML = html; $('modal').classList.remove('oculto'); $('modal').querySelector('.box').scrollTop = 0; }
+function cerrarModal() { $('modal').classList.add('oculto'); $('mCont').innerHTML = ''; }
+$('modal').addEventListener('click', function (e) { if (e.target === this) cerrarModal(); });
+
+/* Refresco automático de la agenda cada 2 minutos */
+setInterval(function () { if (S.token && S.vista === 'hoy' && $('modal').classList.contains('oculto') && !document.hidden) cargarHoy(true); }, 120000);
+</script>
+</body>
+</html>
